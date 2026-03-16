@@ -10,11 +10,11 @@ type KeyMap struct {
 
 var keys = &KeyMap{
 	ExpandNode: key.NewBinding(
-		key.WithKeys("l"),
+		key.WithKeys("l", "right"),
 		key.WithHelp("l", "expand"),
 	),
 	CollapseNode: key.NewBinding(
-		key.WithKeys("h"),
+		key.WithKeys("h", "left"),
 		key.WithHelp("h", "collapse"),
 	),
 	ToggleNode: key.NewBinding(

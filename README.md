@@ -142,22 +142,31 @@ If you want the exact delta configuration I'm using - [it can be found here](htt
 
 ## Keys
 
-| Key               | Description                      |
-| :---------------- | :------------------------------- |
-| <kbd>j</kbd>      | Next node                        |
-| <kbd>k</kbd>      | Previous node                    |
-| <kbd>n</kbd>      | Next file                        |
-| <kbd>p</kbd> / <kbd>N</kbd> | Previous file          |
-| <kbd>Ctrl-d</kbd> | Scroll the diff down             |
-| <kbd>Ctrl-u</kbd> | Scroll the diff up               |
-| <kbd>e</kbd>      | Toggle the file tree             |
-| <kbd>t</kbd>      | Search/go-to file                |
-| <kbd>y</kbd>      | Copy file path                   |
-| <kbd>i</kbd>      | Cycle icon style                 |
-| <kbd>o</kbd>      | Open file in $EDITOR             |
-| <kbd>s</kbd>      | Toggle side-by-side/unified view |
-| <kbd>Tab</kbd>    | Switch focus between the panes   |
-| <kbd>q</kbd>      | Quit                             |
+| Key               | Alias                          | Description                      |
+| :---------------- | :----------------------------- | :------------------------------- |
+| <kbd>j</kbd>      | <kbd>↓</kbd>                   | Next node                        |
+| <kbd>k</kbd>      | <kbd>↑</kbd>                   | Previous node                    |
+| <kbd>n</kbd>      |                                | Next file                        |
+| <kbd>p</kbd> / <kbd>N</kbd> |                       | Previous file                    |
+| <kbd>l</kbd>      | <kbd>→</kbd>                   | Expand and descend to child node |
+| <kbd>h</kbd>      | <kbd>←</kbd>                   | Ascend to and collapse parent    |
+| <kbd>Enter</kbd>  |                                | Toggle expand/collapse           |
+| <kbd>Ctrl-d</kbd> |                                | Scroll the diff down (½ page)    |
+| <kbd>Ctrl-u</kbd> |                                | Scroll the diff up (½ page)      |
+| <kbd>Ctrl-f</kbd> | <kbd>PgDn</kbd>                | Scroll the diff down (full page) |
+| <kbd>Ctrl-b</kbd> | <kbd>PgUp</kbd>                | Scroll the diff up (full page)   |
+| <kbd>g</kbd>      | <kbd>Home</kbd>                | Scroll to top                    |
+| <kbd>G</kbd>      | <kbd>End</kbd>                 | Scroll to bottom                 |
+| <kbd>e</kbd>      |                                | Toggle the file tree             |
+| <kbd>t</kbd>      |                                | Search/go-to file                |
+| <kbd>y</kbd>      |                                | Copy file path                   |
+| <kbd>i</kbd>      |                                | Cycle icon style                 |
+| <kbd>o</kbd>      |                                | Open file in $EDITOR             |
+| <kbd>s</kbd>      |                                | Toggle side-by-side/unified view |
+| <kbd>Tab</kbd>    |                                | Switch focus between the panes   |
+| <kbd>F1</kbd> / <kbd>?</kbd> |                      | Toggle help                      |
+| <kbd>Esc</kbd>    |                                | Close help / Quit                |
+| <kbd>q</kbd>      |                                | Quit                             |
 
 ## Discord
 

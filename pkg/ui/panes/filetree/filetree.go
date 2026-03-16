@@ -465,6 +465,26 @@ func (m *Model) ScrollDown(lines int) {
 	m.t.SetViewportYOffset(newOffset)
 }
 
+// ScrollToTop scrolls to the top of the file tree.
+func (m *Model) ScrollToTop() {
+	m.t.GoToTop()
+}
+
+// ScrollToBottom scrolls to the bottom of the file tree.
+func (m *Model) ScrollToBottom() {
+	m.t.GoToBottom()
+}
+
+// PageUp scrolls the file tree up by one full page.
+func (m *Model) PageUp() {
+	m.t.PageUp()
+}
+
+// PageDown scrolls the file tree down by one full page.
+func (m *Model) PageDown() {
+	m.t.PageDown()
+}
+
 // SetIconStyle changes the icon style and regenerates the tree.
 func (m *Model) SetIconStyle(iconStyle string) {
 	m.cfg.UI.Icons = iconStyle

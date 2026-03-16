@@ -76,6 +76,7 @@ type mainModel struct {
 	sideBySide        bool
 	help              help.Model
 	helpOpen          bool
+	helpShowAllKeys   bool
 }
 
 func New(input string, cfg config.Config) mainModel {
@@ -132,13 +133,34 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(msg, keys.ToggleHelp):
 			m.helpOpen = !m.helpOpen
+			if !m.helpOpen {
+				m.helpShowAllKeys = false
+				m.help.SetKeys(KeyGroups())
+			}
 			return m, tea.Batch(cmds...)
-		case m.helpOpen && (key.Matches(msg, keys.Quit) || msg.Key().Code == tea.KeyEscape):
+		case m.helpOpen && msg.Key().Code == tea.KeyEscape:
 			m.helpOpen = false
+			m.helpShowAllKeys = false
+			m.help.SetKeys(KeyGroups())
+			return m, tea.Batch(cmds...)
+		case m.helpOpen && key.Matches(msg, keys.Quit):
+			m.helpOpen = false
+			m.helpShowAllKeys = false
+			m.help.SetKeys(KeyGroups())
+			return m, tea.Batch(cmds...)
+		case m.helpOpen && msg.String() == "/":
+			m.helpShowAllKeys = !m.helpShowAllKeys
+			if m.helpShowAllKeys {
+				m.help.SetKeys(KeyGroupsAll())
+			} else {
+				m.help.SetKeys(KeyGroups())
+			}
 			return m, tea.Batch(cmds...)
 		case m.helpOpen:
 			// Block all other keys while help is open
 			return m, tea.Batch(cmds...)
+		case msg.Key().Code == tea.KeyEscape:
+			return m, tea.Quit
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
 		case key.Matches(msg, keys.Search):
@@ -193,6 +215,30 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.NextFile):
 			m, cmd = m.moveToFile(1)
 			cmds = append(cmds, cmd)
+		case key.Matches(msg, keys.ScrollTop):
+			if m.activePanel == FileTreePanel {
+				m.fileTree.ScrollToTop()
+			} else {
+				m.diffViewer.GoToTop()
+			}
+		case key.Matches(msg, keys.ScrollBottom):
+			if m.activePanel == FileTreePanel {
+				m.fileTree.ScrollToBottom()
+			} else {
+				m.diffViewer.GoToBottom()
+			}
+		case key.Matches(msg, keys.CtrlF):
+			if m.activePanel == FileTreePanel {
+				m.fileTree.PageDown()
+			} else {
+				m.diffViewer.PageDown()
+			}
+		case key.Matches(msg, keys.CtrlB):
+			if m.activePanel == FileTreePanel {
+				m.fileTree.PageUp()
+			} else {
+				m.diffViewer.PageUp()
+			}
 		case key.Matches(msg, keys.Up):
 			if m.activePanel == FileTreePanel {
 				m, cmd = m.moveCursor(-1)
