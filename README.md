@@ -151,10 +151,10 @@ If you want the exact delta configuration I'm using - [it can be found here](htt
 | <kbd>l</kbd>      | <kbd>→</kbd>                   | Expand and descend to child node |
 | <kbd>h</kbd>      | <kbd>←</kbd>                   | Ascend to and collapse parent    |
 | <kbd>Enter</kbd>  |                                | Toggle expand/collapse           |
-| <kbd>Ctrl-d</kbd> |                                | Scroll the diff down (½ page)    |
-| <kbd>Ctrl-u</kbd> |                                | Scroll the diff up (½ page)      |
-| <kbd>Ctrl-f</kbd> | <kbd>PgDn</kbd>                | Scroll the diff down (full page) |
-| <kbd>Ctrl-b</kbd> | <kbd>PgUp</kbd>                | Scroll the diff up (full page)   |
+| <kbd>Ctrl-d</kbd> |                                | Scroll down (½ page)             |
+| <kbd>Ctrl-u</kbd> |                                | Scroll up (½ page)               |
+| <kbd>Ctrl-f</kbd> | <kbd>PgDn</kbd>                | Scroll down (full page)          |
+| <kbd>Ctrl-b</kbd> | <kbd>PgUp</kbd>                | Scroll up (full page)            |
 | <kbd>g</kbd>      | <kbd>Home</kbd>                | Scroll to top                    |
 | <kbd>G</kbd>      | <kbd>End</kbd>                 | Scroll to bottom                 |
 | <kbd>e</kbd>      |                                | Toggle the file tree             |

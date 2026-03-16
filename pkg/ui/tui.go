@@ -134,19 +134,14 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.ToggleHelp):
 			m.helpOpen = !m.helpOpen
 			if !m.helpOpen {
-				m.helpShowAllKeys = false
-				m.help.SetKeys(KeyGroups())
+				m.closeHelp()
 			}
 			return m, tea.Batch(cmds...)
 		case m.helpOpen && msg.Key().Code == tea.KeyEscape:
-			m.helpOpen = false
-			m.helpShowAllKeys = false
-			m.help.SetKeys(KeyGroups())
+			m.closeHelp()
 			return m, tea.Batch(cmds...)
 		case m.helpOpen && key.Matches(msg, keys.Quit):
-			m.helpOpen = false
-			m.helpShowAllKeys = false
-			m.help.SetKeys(KeyGroups())
+			m.closeHelp()
 			return m, tea.Batch(cmds...)
 		case m.helpOpen && msg.String() == "/":
 			m.helpShowAllKeys = !m.helpShowAllKeys
@@ -594,6 +589,12 @@ func (m *mainModel) stopSearch() {
 	m.search.SetValue("")
 	m.search.Blur()
 	m.search.SetWidth(m.searchWidth())
+}
+
+func (m *mainModel) closeHelp() {
+	m.helpOpen = false
+	m.helpShowAllKeys = false
+	m.help.SetKeys(KeyGroups())
 }
 
 func (m mainModel) openInEditor() tea.Cmd {
