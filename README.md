@@ -158,14 +158,14 @@ If you want the exact delta configuration I'm using - [it can be found here](htt
 | <kbd>g</kbd>      | <kbd>Home</kbd>                | Scroll to top                    |
 | <kbd>G</kbd>      | <kbd>End</kbd>                 | Scroll to bottom                 |
 | <kbd>e</kbd>      |                                | Toggle the file tree             |
-| <kbd>t</kbd>      |                                | Search/go-to file                |
+| <kbd>F3</kbd>      |                                | Filter files                     |
 | <kbd>y</kbd>      |                                | Copy file path                   |
 | <kbd>i</kbd>      |                                | Cycle icon style                 |
-| <kbd>o</kbd>      |                                | Open file in $EDITOR             |
+| <kbd>o</kbd>      |                                | Edit file in $EDITOR             |
 | <kbd>s</kbd>      |                                | Toggle side-by-side/unified view |
 | <kbd>Tab</kbd>    |                                | Switch focus between the panes   |
 | <kbd>F1</kbd> / <kbd>?</kbd> |                      | Toggle help                      |
-| <kbd>Esc</kbd>    |                                | Close help / Quit                |
+| <kbd>Esc</kbd>    |                                | Close help / Cancel filter       |
 | <kbd>q</kbd>      |                                | Quit                             |
 
 ## Discord
