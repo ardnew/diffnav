@@ -12,8 +12,13 @@ type KeyMap struct {
 	PrevFile        key.Binding
 	CtrlD           key.Binding
 	CtrlU           key.Binding
+	CtrlF           key.Binding
+	CtrlB           key.Binding
+	ScrollTop       key.Binding
+	ScrollBottom    key.Binding
 	ToggleFileTree  key.Binding
-	Search          key.Binding
+	Filter          key.Binding
+	Escape          key.Binding
 	Quit            key.Binding
 	Copy            key.Binding
 	SwitchPanel     key.Binding
@@ -25,12 +30,12 @@ type KeyMap struct {
 
 var keys = &KeyMap{
 	ExpandNode: key.NewBinding(
-		key.WithKeys("l"),
-		key.WithHelp("l", "expand"),
+		key.WithKeys("l", "right"),
+		key.WithHelp("→/l", "expand"),
 	),
 	CollapseNode: key.NewBinding(
-		key.WithKeys("h"),
-		key.WithHelp("h", "collapse"),
+		key.WithKeys("h", "left"),
+		key.WithHelp("←/h", "collapse"),
 	),
 	ToggleNode: key.NewBinding(
 		key.WithKeys("enter"),
@@ -38,11 +43,11 @@ var keys = &KeyMap{
 	),
 	Up: key.NewBinding(
 		key.WithKeys("up", "k"),
-		key.WithHelp("↑/k", "prev file"),
+		key.WithHelp("↑/k", "prev node"),
 	),
 	Down: key.NewBinding(
 		key.WithKeys("down", "j"),
-		key.WithHelp("↓/j", "next file"),
+		key.WithHelp("↓/j", "next node"),
 	),
 	NextFile: key.NewBinding(
 		key.WithKeys("n"),
@@ -54,19 +59,39 @@ var keys = &KeyMap{
 	),
 	CtrlD: key.NewBinding(
 		key.WithKeys("ctrl+d"),
-		key.WithHelp("ctrl+d", "diff down"),
+		key.WithHelp("ctrl+d", "½ page down"),
 	),
 	CtrlU: key.NewBinding(
 		key.WithKeys("ctrl+u"),
-		key.WithHelp("ctrl+u", "diff up"),
+		key.WithHelp("ctrl+u", "½ page up"),
+	),
+	CtrlF: key.NewBinding(
+		key.WithKeys("ctrl+f", "pgdown"),
+		key.WithHelp("ctrl+f/PgDn", "page down"),
+	),
+	CtrlB: key.NewBinding(
+		key.WithKeys("ctrl+b", "pgup"),
+		key.WithHelp("ctrl+b/PgUp", "page up"),
+	),
+	ScrollTop: key.NewBinding(
+		key.WithKeys("g", "home"),
+		key.WithHelp("g/Home", "scroll to top"),
+	),
+	ScrollBottom: key.NewBinding(
+		key.WithKeys("G", "end"),
+		key.WithHelp("G/End", "scroll to bottom"),
 	),
 	ToggleFileTree: key.NewBinding(
 		key.WithKeys("e"),
 		key.WithHelp("e", "toggle file tree"),
 	),
-	Search: key.NewBinding(
-		key.WithKeys("t"),
-		key.WithHelp("t", "search files"),
+	Filter: key.NewBinding(
+		key.WithKeys("t", "f3"),
+		key.WithHelp("F3/t", "filter files"),
+	),
+	Escape: key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("Esc", "cancel / quit"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
@@ -82,7 +107,7 @@ var keys = &KeyMap{
 	),
 	OpenInEditor: key.NewBinding(
 		key.WithKeys("o"),
-		key.WithHelp("o", "open"),
+		key.WithHelp("o", "edit file"),
 	),
 	ToggleDiffView: key.NewBinding(
 		key.WithKeys("s"),
@@ -98,24 +123,39 @@ var keys = &KeyMap{
 	),
 }
 
-func KeyGroups() [][]key.Binding {
+func keyGroups() [][]key.Binding {
+	spacer := key.NewBinding(key.WithKeys(""), key.WithHelp(" ", " "))
+
 	return [][]key.Binding{{
 		keys.SwitchPanel,
 		keys.Up,
 		keys.Down,
 		keys.NextFile,
 		keys.PrevFile,
+		keys.ExpandNode,
+		keys.CollapseNode,
+		keys.ToggleNode,
+		spacer,
 		keys.CtrlD,
 		keys.CtrlU,
+		keys.CtrlF,
+		keys.CtrlB,
+		keys.ScrollTop,
+		keys.ScrollBottom,
 	}, {
 		keys.ToggleFileTree,
-		keys.Search,
+		keys.Filter,
 		keys.Copy,
 		keys.OpenInEditor,
 		keys.ToggleDiffView,
 		keys.ToggleIconStyle,
-	}, {
+		spacer,
 		keys.ToggleHelp,
+		keys.Escape,
 		keys.Quit,
 	}}
+}
+
+func KeyGroups() [][]key.Binding {
+	return keyGroups()
 }
