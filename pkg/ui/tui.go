@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
@@ -28,19 +28,18 @@ import (
 	"github.com/dlvhdr/diffnav/pkg/utils"
 	"github.com/dlvhdr/diffnav/pkg/watch"
 	"github.com/lrstanley/go-nf/glyphs/md"
-	"github.com/lrstanley/go-nf/glyphs/neo"
 )
 
 const (
 	minResizeStep = 6
 	footerHeight  = 1
 	headerHeight  = 2
-	searchHeight  = 3
+	filterHeight  = 3
 
 	// Zone IDs for bubblezone click detection.
-	zoneSearchBox     = "searchbox"
+	zoneFilterBox     = "filterbox"
 	zoneFileTree      = "filetree"
-	zoneSearchResults = "searchresults"
+	zoneFilterResults = "filterresults"
 	zoneDiffViewer    = "diffviewer"
 	zoneHelp          = "help"
 	zoneHeader        = "header"
@@ -72,10 +71,10 @@ type mainModel struct {
 	height            int
 	isShowingFileTree bool
 	activePanel       Panel
-	search            textinput.Model
+	filter            textinput.Model
 	resultsVp         viewport.Model
 	resultsCursor     int
-	searching         bool
+	filtering         bool
 	filtered          []string
 	config            config.Config
 	draggingSidebar   bool
@@ -113,18 +112,18 @@ func New(input string, cfg config.Config) mainModel {
 	m.help = help.New()
 	m.help.SetKeys(KeyGroups())
 
-	m.search = textinput.New()
-	m.search.ShowSuggestions = true
-	m.search.KeyMap.AcceptSuggestion = key.NewBinding(key.WithKeys("tab"))
-	m.search.Prompt = " "
-	m.search.Placeholder = "Filter files 󰬛 "
-	m.search.SetStyles(textinput.Styles{
+	m.filter = textinput.New()
+	m.filter.ShowSuggestions = true
+	m.filter.KeyMap.AcceptSuggestion = key.NewBinding(key.WithKeys("tab"))
+	m.filter.Prompt = " "
+	m.filter.Placeholder = fmt.Sprintf("(%s) Filter files", keys.Filter.Help().Key)
+	m.filter.SetStyles(textinput.Styles{
 		Focused: textinput.StyleState{
 			Placeholder: lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
 			Prompt:      lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
 		},
 	})
-	m.search.SetWidth(cfg.UI.FileTreeWidth - 2)
+	m.filter.SetWidth(cfg.UI.FileTreeWidth - 2)
 
 	m.resultsVp = viewport.Model{}
 
@@ -161,25 +160,28 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
-	// Handle mouse events regardless of search mode
+	// Handle mouse events regardless of filter mode
 	if msg, ok := msg.(tea.MouseMsg); ok {
 		return m.handleMouse(msg)
 	}
 
-	if m.searching {
-		var sCmds []tea.Cmd
-		m, sCmds = m.searchUpdate(msg)
-		cmds = append(cmds, sCmds...)
-		return m, tea.Batch(cmds...)
+	// Filter out key release events to prevent double-firing.
+	// bubbletea/v2 generates both KeyPressMsg and KeyReleaseMsg as standard
+	// events (not Kitty Keyboard Protocol); we only handle key presses.
+	if _, ok := msg.(tea.KeyReleaseMsg); ok {
+		return m, nil
 	}
 
-	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
+	// Help/message toggle is always available, even while filtering.
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
 		switch {
 		case key.Matches(msg, keys.ToggleHelp):
 			m.helpOpen = !m.helpOpen
 			m.messageOpen = false
-			return m, tea.Batch(cmds...)
+			if !m.helpOpen {
+				m.closeHelp()
+			}
+			return m, nil
 		case key.Matches(msg, keys.ToggleMessage):
 			if m.preamble != "" {
 				m.messageOpen = !m.messageOpen
@@ -189,41 +191,77 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.messageVp.GotoTop()
 				}
 			}
-			return m, tea.Batch(cmds...)
-		case (m.helpOpen || m.messageOpen) && (key.Matches(msg, keys.Quit) || msg.Key().Code == tea.KeyEscape):
-			m.helpOpen = false
+			return m, nil
+		case m.helpOpen && key.Matches(msg, keys.Escape):
+			m.closeHelp()
+			return m, nil
+		case m.messageOpen && key.Matches(msg, keys.Escape):
 			m.messageOpen = false
-			return m, tea.Batch(cmds...)
+			return m, nil
 		case m.messageOpen && key.Matches(msg, keys.Down):
 			m.messageVp.ScrollDown(1)
-			return m, tea.Batch(cmds...)
+			return m, nil
 		case m.messageOpen && key.Matches(msg, keys.CtrlD):
 			m.messageVp.ScrollDown(m.messageVp.Height() / 2)
-			return m, tea.Batch(cmds...)
+			return m, nil
 		case m.messageOpen && key.Matches(msg, keys.Up):
 			m.messageVp.ScrollUp(1)
-			return m, tea.Batch(cmds...)
+			return m, nil
 		case m.messageOpen && key.Matches(msg, keys.CtrlU):
 			m.messageVp.ScrollUp(m.messageVp.Height() / 2)
-			return m, tea.Batch(cmds...)
+			return m, nil
 		case m.helpOpen || m.messageOpen:
 			// Block all other keys while an overlay is open
-			return m, tea.Batch(cmds...)
+			return m, nil
+
+		// Esc priority chain (help already handled above):
+		// 2. Diff view active → activate explorer pane (when visible)
+		// 3. Filter files mode → return to normal tree explorer
+		// 4. Otherwise → quit
+		case key.Matches(msg, keys.Escape):
+			if m.activePanel == DiffViewerPanel {
+				// Only switch focus to the file tree if it is currently visible.
+				if m.isShowingFileTree {
+					m.activePanel = FileTreePanel
+					return m, nil
+				}
+				// If the file tree is hidden, do not switch focus to a non-visible pane.
+			}
+			if m.filtering {
+				m.stopFilter()
+				dfCmd := m.diffViewer.SetSize(m.width-m.sidebarWidth(), m.mainContentHeight())
+				return m, dfCmd
+			}
+			return m, tea.Quit
+		}
+	}
+
+	if m.filtering {
+		var sCmds []tea.Cmd
+		m, sCmds = m.filterUpdate(msg)
+		cmds = append(cmds, sCmds...)
+		return m, tea.Batch(cmds...)
+	}
+
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
-		case key.Matches(msg, keys.Search):
-			m.searching = true
-			m.search.SetWidth(m.searchWidth())
-			m.search.SetValue("")
+		case key.Matches(msg, keys.Filter):
+			m.filtering = true
+			m.filter.SetWidth(m.filterWidth())
+			m.filter.SetValue("")
 			m.resultsCursor = 0
-			m.setSearchResults()
+			m.setFilterResults()
 
-			m.resultsVp.SetWidth(m.config.UI.SearchTreeWidth)
-			m.resultsVp.SetHeight(m.mainContentHeight() - searchHeight)
+			m.resultsVp.SetWidth(m.config.UI.FilterTreeWidth)
+			m.resultsVp.SetHeight(m.mainContentHeight() - filterHeight)
 			m.resultsVp.SetContent(m.resultsView())
 
 			dfCmd := m.diffViewer.SetSize(m.width-m.sidebarWidth(), m.mainContentHeight())
-			cmds = append(cmds, dfCmd, m.search.Focus())
+			cmds = append(cmds, dfCmd, m.filter.Focus())
+			return m, tea.Batch(cmds...)
 		case key.Matches(msg, keys.ToggleFileTree):
 			m.isShowingFileTree = !m.isShowingFileTree
 			sidebarWidth := m.sidebarWidth()
@@ -239,16 +277,19 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				treeWidth = m.config.UI.FileTreeWidth
 			}
 
-			m.fileTree.SetSize(treeWidth, h-searchHeight)
-			m.search.SetWidth(m.searchWidth())
+			m.fileTree.SetSize(treeWidth, h-filterHeight)
+			m.filter.SetWidth(m.filterWidth())
 			dfCmd := m.diffViewer.SetSize(m.width-sidebarWidth, h)
 			cmds = append(cmds, dfCmd)
+			return m, tea.Batch(cmds...)
 		case key.Matches(msg, keys.ToggleIconStyle):
 			m.cycleIconStyle()
+			return m, nil
 		case key.Matches(msg, keys.ToggleDiffView):
 			m.sideBySide = !m.sideBySide
 			cmd = m.diffViewer.SetSideBySide(m.sideBySide)
 			cmds = append(cmds, cmd)
+			return m, tea.Batch(cmds...)
 		case key.Matches(msg, keys.SwitchPanel):
 			if m.isShowingFileTree {
 				if m.activePanel == FileTreePanel {
@@ -257,12 +298,37 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.activePanel = FileTreePanel
 				}
 			}
+			return m, nil
 		case key.Matches(msg, keys.PrevFile):
 			m, cmd = m.moveToFile(-1)
 			cmds = append(cmds, cmd)
+			return m, tea.Batch(cmds...)
 		case key.Matches(msg, keys.NextFile):
 			m, cmd = m.moveToFile(1)
 			cmds = append(cmds, cmd)
+			return m, tea.Batch(cmds...)
+
+		// Scroll-oriented keybindings always operate on the diff viewer.
+		case key.Matches(msg, keys.ScrollTop):
+			m.diffViewer.GoToTop()
+			return m, nil
+		case key.Matches(msg, keys.ScrollBottom):
+			m.diffViewer.GoToBottom()
+			return m, nil
+		case key.Matches(msg, keys.CtrlF):
+			m.diffViewer.PageDown()
+			return m, nil
+		case key.Matches(msg, keys.CtrlB):
+			m.diffViewer.PageUp()
+			return m, nil
+		case key.Matches(msg, keys.CtrlD):
+			m.diffViewer.PageDown()
+			return m, nil
+		case key.Matches(msg, keys.CtrlU):
+			m.diffViewer.PageUp()
+			return m, nil
+
+		// Tree traversal keys operate on whichever view is active.
 		case key.Matches(msg, keys.Up):
 			if m.activePanel == FileTreePanel {
 				m, cmd = m.moveCursor(-1)
@@ -270,6 +336,7 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.diffViewer.ScrollUp(1)
 			}
+			return m, tea.Batch(cmds...)
 		case key.Matches(msg, keys.Down):
 			if m.activePanel == FileTreePanel {
 				m, cmd = m.moveCursor(1)
@@ -277,16 +344,49 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.diffViewer.ScrollDown(1)
 			}
+			return m, tea.Batch(cmds...)
+
+		// Expand/collapse/toggle operate on the file tree.
+		case key.Matches(msg, keys.ExpandNode):
+			if m.activePanel == FileTreePanel {
+				m.fileTree.ExpandAndDescend()
+				node := m.fileTree.GetCurrNode()
+				m, cmd = m.setNodeDiff(node)
+				cmds = append(cmds, cmd)
+				m.diffViewer.GoToTop()
+			}
+			return m, tea.Batch(cmds...)
+		case key.Matches(msg, keys.CollapseNode):
+			if m.activePanel == FileTreePanel {
+				m.fileTree.CollapseOrMoveToParent()
+				node := m.fileTree.GetCurrNode()
+				m, cmd = m.setNodeDiff(node)
+				cmds = append(cmds, cmd)
+				m.diffViewer.GoToTop()
+			}
+			return m, tea.Batch(cmds...)
+		case key.Matches(msg, keys.ToggleNode):
+			if m.activePanel == FileTreePanel {
+				m.fileTree.ToggleCurrentNode()
+				node := m.fileTree.GetCurrNode()
+				m, cmd = m.setNodeDiff(node)
+				cmds = append(cmds, cmd)
+				m.diffViewer.GoToTop()
+			}
+			return m, tea.Batch(cmds...)
+
 		case key.Matches(msg, keys.Copy):
 			cmd = m.fileTree.CopyCurrNodePath()
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
+			return m, tea.Batch(cmds...)
 		case key.Matches(msg, keys.OpenInEditor):
 			cmd = m.openInEditor()
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
+			return m, tea.Batch(cmds...)
 		}
 
 	case tea.WindowSizeMsg:
@@ -297,10 +397,10 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		dfCmd := m.diffViewer.SetSize(m.width-m.sidebarWidth(), m.mainContentHeight())
 		cmds = append(cmds, dfCmd)
 
-		tWidth, tHeight := m.sidebarWidth(), m.mainContentHeight()-searchHeight
+		tWidth, tHeight := m.sidebarWidth(), m.mainContentHeight()-filterHeight
 
 		m.fileTree.SetSize(tWidth, tHeight)
-		m.search.SetWidth(m.searchWidth())
+		m.filter.SetWidth(m.filterWidth())
 		if m.messageOpen {
 			m.updateMessageVp()
 		}
@@ -354,28 +454,15 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		log.Fatal(msg.Err)
 	}
 
-	// Route messages: key messages go only to active panel, other messages go to both.
-	// Exception: ctrl+d/ctrl+u go to diffViewer for scrolling (unless an overlay is open).
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+d", "ctrl+u":
-			m.diffViewer, cmd = m.diffViewer.Update(msg)
-			cmds = append(cmds, cmd)
-		default:
-			if m.activePanel == DiffViewerPanel {
-				m.diffViewer, cmd = m.diffViewer.Update(msg)
-				cmds = append(cmds, cmd)
-			} else {
-				m.fileTree.Update(msg)
-				cmds = append(cmds, cmd)
-			}
-		}
+	// Route non-key messages to sub-components for internal processing
+	// (e.g. diffContentMsg).
+	switch msg.(type) {
+	case tea.KeyPressMsg, tea.KeyReleaseMsg:
+		// Already handled above; do not forward again.
 	default:
 		m.diffViewer, cmd = m.diffViewer.Update(msg)
 		cmds = append(cmds, cmd)
 		m.fileTree.Update(msg)
-		cmds = append(cmds, cmd)
 	}
 
 	return m, tea.Batch(cmds...)
@@ -403,25 +490,27 @@ func (m *mainModel) cycleIconStyle() {
 	m.fileTree.SetIconStyle(m.iconStyle)
 }
 
-func (m mainModel) searchUpdate(msg tea.Msg) (mainModel, []tea.Cmd) {
+func (m mainModel) filterUpdate(msg tea.Msg) (mainModel, []tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
-	if m.search.Focused() {
+
+	// Filter out key release events to prevent double-firing.
+	if _, ok := msg.(tea.KeyReleaseMsg); ok {
+		return m, nil
+	}
+
+	if m.filter.Focused() {
 		switch msg := msg.(type) {
-		case tea.KeyMsg:
+		case tea.KeyPressMsg:
 			switch msg.String() {
-			case "esc":
-				m.stopSearch()
-				dfCmd := m.diffViewer.SetSize(m.width-m.sidebarWidth(), m.mainContentHeight())
-				cmds = append(cmds, dfCmd)
 			case "ctrl+c":
 				return m, []tea.Cmd{tea.Quit}
 			case "enter":
-				m.stopSearch()
+				m.stopFilter()
 				dfCmd := m.diffViewer.SetSize(m.width-m.sidebarWidth(), m.mainContentHeight())
 				cmds = append(cmds, dfCmd)
 
-				if selected, ok := m.selectedSearchResult(); ok {
+				if selected, ok := m.selectedFilterResult(); ok {
 					for _, f := range m.files {
 						if filenode.GetFileName(f) == selected {
 							m.diffViewer, cmd = m.diffViewer.SetFilePatch(f)
@@ -446,10 +535,10 @@ func (m mainModel) searchUpdate(msg tea.Msg) (mainModel, []tea.Cmd) {
 				m.resultsCursor = 0
 			}
 		}
-		s, sc := m.search.Update(msg)
+		s, sc := m.filter.Update(msg)
 		cmds = append(cmds, sc)
-		m.search = s
-		m.setSearchResults()
+		m.filter = s
+		m.setFilterResults()
 		m.resultsVp.SetContent(m.resultsView())
 	}
 
@@ -461,11 +550,10 @@ func (m mainModel) View() tea.View {
 	view.AltScreen = true
 	view.MouseMode = tea.MouseModeAllMotion
 
-	view.KeyboardEnhancements.ReportEventTypes = true
 	// Determine colors based on active panel.
 	leftColor := lipgloss.Color("8")
 	rightColor := lipgloss.Color("8")
-	if m.activePanel == FileTreePanel && !m.searching {
+	if m.activePanel == FileTreePanel && !m.filtering {
 		leftColor = lipgloss.Color("4")
 	} else if m.activePanel == DiffViewerPanel {
 		rightColor = lipgloss.Color("4")
@@ -494,21 +582,21 @@ func (m mainModel) View() tea.View {
 
 	sidebar := ""
 	if m.isSidebarVisible() {
-		searchBox := lipgloss.NewStyle().
+		filterBox := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("8")).
 			Width(m.sidebarWidth()).
-			Render(m.search.View())
-		searchBox = zone.Mark(zoneSearchBox, searchBox)
+			Render(m.filter.View())
+		filterBox = zone.Mark(zoneFilterBox, filterBox)
 
 		content := ""
-		if m.searching {
-			content = zone.Mark(zoneSearchResults, m.resultsVp.View())
+		if m.filtering {
+			content = zone.Mark(zoneFilterResults, m.resultsVp.View())
 		} else {
 			content = zone.Mark(zoneFileTree, m.fileTree.View())
 		}
 		content = lipgloss.NewStyle().
-			Render(lipgloss.JoinVertical(lipgloss.Left, searchBox, content))
+			Render(lipgloss.JoinVertical(lipgloss.Left, filterBox, content))
 
 		sidebar = lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder(), false, true, false, false).
@@ -880,49 +968,60 @@ func (m mainModel) renderScrollbar() string {
 
 func (m mainModel) resultsView() string {
 	sb := strings.Builder{}
-	baseStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F7F7F7"))
-	dirStyle := lipgloss.NewStyle().Bold(false).Foreground(lipgloss.Color("#B8B8B8"))
+	query := m.filter.Value()
 	for i, f := range m.filtered {
-		icon := neo.ByPath(f)
-		if icon == nil {
-			icon = neo.ByFileExtension("txt")
-		}
-		base := utils.RemoveReset(lipgloss.NewStyle().
-			Foreground(icon.Color(true)).
-			Render(icon.Glyph().String()) + " " + baseStyle.Render(path.Base(f)))
-		dir := utils.TruncateString(
-			dirStyle.Render(path.Dir(f)),
-			m.config.UI.SearchTreeWidth-2-lipgloss.Width(base),
-		)
-		if path.Dir(f) == "." {
-			dir = ""
-		}
+		fName := utils.TruncateString(" "+f, m.config.UI.FilterTreeWidth-2)
+		base := lipgloss.NewStyle()
 		if i == m.resultsCursor {
-			bg := lipgloss.NewStyle().Background(lipgloss.Color("#1b1b33"))
-			fName := lipgloss.NewStyle().
-				Bold(true).
-				Render(bg.Render(base)) +
-				bg.Render(
-					" ",
-				) + bg.Render(
-				dir,
-			)
-			sb.WriteString(bg.
-				Width(m.config.UI.SearchTreeWidth).
-				Render(fName) +
-				"\n",
-			)
-		} else {
-			fName := base + " " + dir
-			sb.WriteString(fName + "\n")
+			base = base.Background(lipgloss.Color("#1b1b33")).Bold(true)
 		}
+		sb.WriteString(highlightMatch(fName, query, base) + "\n")
 	}
 	return sb.String()
 }
 
+// highlightMatch renders s with the first case-insensitive occurrence of query
+// underlined. If query is empty or not found the full string is returned
+// styled with base only.
+//
+// The match position is computed by scanning s rune-by-rune and comparing with
+// strings.EqualFold. This avoids the byte-offset mismatch that can occur when
+// strings.ToLower changes byte lengths for certain Unicode characters (e.g.
+// Kelvin sign U+212A lowercases to ASCII 'k').
+func highlightMatch(s, query string, base lipgloss.Style) string {
+	if query == "" {
+		return base.Render(s)
+	}
+	qRunes := utf8.RuneCountInString(query)
+	// Slide a window of qRunes runes across s, comparing with EqualFold.
+	i := 0
+	for i < len(s) {
+		// Advance j past qRunes runes starting at i.
+		j := i
+		n := 0
+		for n < qRunes && j < len(s) {
+			_, size := utf8.DecodeRuneInString(s[j:])
+			j += size
+			n++
+		}
+		if n < qRunes {
+			// Not enough runes remaining for a match.
+			break
+		}
+		if strings.EqualFold(s[i:j], query) {
+			hl := base.Copy().Underline(true)
+			return base.Render(s[:i]) + hl.Render(s[i:j]) + base.Render(s[j:])
+		}
+		// Advance i by one rune.
+		_, size := utf8.DecodeRuneInString(s[i:])
+		i += size
+	}
+	return base.Render(s)
+}
+
 func (m mainModel) sidebarWidth() int {
-	if m.searching {
-		return m.config.UI.SearchTreeWidth
+	if m.filtering {
+		return m.config.UI.FilterTreeWidth
 	}
 
 	if m.isShowingFileTree {
@@ -946,15 +1045,19 @@ func (m mainModel) footerHeight() int {
 	return footerHeight
 }
 
-func (m *mainModel) searchWidth() int {
+func (m *mainModel) filterWidth() int {
 	return max(0, m.sidebarWidth()-5)
 }
 
-func (m *mainModel) stopSearch() {
-	m.searching = false
-	m.search.SetValue("")
-	m.search.Blur()
-	m.search.SetWidth(m.searchWidth())
+func (m *mainModel) stopFilter() {
+	m.filtering = false
+	m.filter.SetValue("")
+	m.filter.Blur()
+	m.filter.SetWidth(m.filterWidth())
+}
+
+func (m *mainModel) closeHelp() {
+	m.helpOpen = false
 }
 
 func (m mainModel) openInEditor() tea.Cmd {
@@ -1057,8 +1160,7 @@ func (m mainModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		if msg.Button == tea.MouseLeft {
 			// Keep coordinate check for resize border (hybrid approach).
 			sidebarWidth := m.sidebarWidth()
-			if !m.searching && m.isShowingFileTree &&
-				abs(msg.X-sidebarWidth) <= sidebarGrabThreshold {
+			if !m.filtering && m.isShowingFileTree && abs(msg.X-sidebarWidth) <= sidebarGrabThreshold {
 				m.draggingSidebar = true
 				return m, nil
 			}
@@ -1070,13 +1172,13 @@ func (m mainModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 
 			// Zone-based detection for everything else.
-			if zone.Get(zoneSearchBox).InBounds(msg) {
-				return m.handleSearchBoxClick()
+			if zone.Get(zoneFilterBox).InBounds(msg) {
+				return m.handleFilterBoxClick()
 			}
-			if m.searching && zone.Get(zoneSearchResults).InBounds(msg) {
-				return m.handleSearchResultClick(msg)
+			if m.filtering && zone.Get(zoneFilterResults).InBounds(msg) {
+				return m.handleFilterResultClick(msg)
 			}
-			if !m.searching && zone.Get(zoneFileTree).InBounds(msg) {
+			if !m.filtering && zone.Get(zoneFileTree).InBounds(msg) {
 				return m.handleFileTreeClick(msg)
 			}
 			if zone.Get(zoneHelp).InBounds(msg) {
@@ -1107,9 +1209,9 @@ func (m mainModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m mainModel) handleSearchResultClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+func (m mainModel) handleFilterResultClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// Use zone-relative coordinates.
-	_, y := zone.Get(zoneSearchResults).Pos(msg)
+	_, y := zone.Get(zoneFilterResults).Pos(msg)
 	if y < 0 {
 		return m, nil
 	}
@@ -1120,7 +1222,7 @@ func (m mainModel) handleSearchResultClick(msg tea.MouseMsg) (tea.Model, tea.Cmd
 
 	// Select the clicked result.
 	selected := m.filtered[clickedIndex]
-	m.stopSearch()
+	m.stopFilter()
 
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
@@ -1139,22 +1241,22 @@ func (m mainModel) handleSearchResultClick(msg tea.MouseMsg) (tea.Model, tea.Cmd
 	return m, tea.Batch(cmds...)
 }
 
-func (m mainModel) handleSearchBoxClick() (tea.Model, tea.Cmd) {
-	if m.searching {
+func (m mainModel) handleFilterBoxClick() (tea.Model, tea.Cmd) {
+	if m.filtering {
 		return m, nil
 	}
-	m.searching = true
-	m.search.SetWidth(m.searchWidth())
-	m.search.SetValue("")
+	m.filtering = true
+	m.filter.SetWidth(m.filterWidth())
+	m.filter.SetValue("")
 	m.resultsCursor = 0
-	m.setSearchResults()
+	m.setFilterResults()
 
-	m.resultsVp.SetWidth(m.config.UI.SearchTreeWidth)
-	m.resultsVp.SetHeight(m.mainContentHeight() - searchHeight)
+	m.resultsVp.SetWidth(m.config.UI.FilterTreeWidth)
+	m.resultsVp.SetHeight(m.mainContentHeight() - filterHeight)
 	m.resultsVp.SetContent(m.resultsView())
 
 	dfCmd := m.diffViewer.SetSize(m.width-m.sidebarWidth(), m.mainContentHeight())
-	return m, tea.Batch(dfCmd, m.search.Focus())
+	return m, tea.Batch(dfCmd, m.filter.Focus())
 }
 
 func (m mainModel) handleFileTreeClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
@@ -1180,16 +1282,16 @@ func (m mainModel) handleFileTreeClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 func (m mainModel) handleScroll(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	lines := scrollLines
 
-	// Check if scrolling in sidebar (file tree or search results).
-	if zone.Get(zoneFileTree).InBounds(msg) || zone.Get(zoneSearchResults).InBounds(msg) {
+	// Check if scrolling in sidebar (file tree or filter results).
+	if zone.Get(zoneFileTree).InBounds(msg) || zone.Get(zoneFilterResults).InBounds(msg) {
 		if msg.Mouse().Button == tea.MouseWheelUp {
-			if m.searching {
+			if m.filtering {
 				m.resultsVp.ScrollUp(lines)
 			} else {
 				m.fileTree.ScrollUp(lines)
 			}
 		} else {
-			if m.searching {
+			if m.filtering {
 				m.resultsVp.ScrollDown(lines)
 			} else {
 				m.fileTree.ScrollDown(lines)
@@ -1210,7 +1312,7 @@ func (m mainModel) handleScroll(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m mainModel) handleSidebarDrag(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if m.searching {
+	if m.filtering {
 		m.draggingSidebar = false
 		return m, nil
 	}
@@ -1238,7 +1340,7 @@ func (m mainModel) handleSidebarDrag(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	cmds := []tea.Cmd{}
 
 	cmds = append(cmds, m.diffViewer.SetSize(m.width-newWidth, m.mainContentHeight()))
-	m.fileTree.SetSize(newWidth-1, m.mainContentHeight()-searchHeight-1)
+	m.fileTree.SetSize(newWidth-1, m.mainContentHeight()-filterHeight-1)
 
 	return m, tea.Batch(cmds...)
 }
@@ -1305,12 +1407,12 @@ func (m mainModel) setNodeDiff(node *tree.Node) (mainModel, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *mainModel) setSearchResults() {
+func (m *mainModel) setFilterResults() {
 	filtered := make([]string, 0)
 	for _, f := range m.files {
 		if strings.Contains(
 			strings.ToLower(filenode.GetFileName(f)),
-			strings.ToLower(m.search.Value()),
+			strings.ToLower(m.filter.Value()),
 		) {
 			filtered = append(filtered, filenode.GetFileName(f))
 		}
@@ -1326,7 +1428,7 @@ func (m *mainModel) setSearchResults() {
 	}
 }
 
-func (m mainModel) selectedSearchResult() (string, bool) {
+func (m mainModel) selectedFilterResult() (string, bool) {
 	if len(m.filtered) == 0 {
 		return "", false
 	}
@@ -1337,5 +1439,5 @@ func (m mainModel) selectedSearchResult() (string, bool) {
 }
 
 func (m mainModel) isSidebarVisible() bool {
-	return m.isShowingFileTree || m.searching
+	return m.isShowingFileTree || m.filtering
 }

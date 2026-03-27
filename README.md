@@ -113,8 +113,8 @@ ui:
   # Customize the file tree width (default: 26)
   fileTreeWidth: 30
 
-  # Customize the search panel width (default: 50)
-  searchTreeWidth: 60
+  # Customize the filter panel width (default: 50)
+  filterTreeWidth: 60
 
   # Icon style: "status" (default), "simple", "filetype", "full", "unicode", or "ascii"
   icons: nerd-fonts-status
@@ -135,7 +135,7 @@ ui:
 | `ui.hideFooter`      | bool   | `false`             | Hide the footer with keybindings help                     |
 | `ui.showFileTree`    | bool   | `true`              | Show file tree on startup                                 |
 | `ui.fileTreeWidth`   | int    | `26`                | Width of the file tree sidebar                            |
-| `ui.searchTreeWidth` | int    | `50`                | Width of the search panel                                 |
+| `ui.filterTreeWidth` | int    | `50`                | Width of the filter panel                                 |
 | `ui.icons`           | string | `nerd-fonts-status` | Icon style (see below for details)                        |
 | `ui.colorFileNames`  | bool   | `true`              | Color filenames by git status                             |
 | `ui.showDiffStats`   | bool   | `true`              | Show the amount of lines added / removed next to the file |
@@ -160,22 +160,31 @@ If you want the exact delta configuration I'm using - [it can be found here](htt
 
 ## Keys
 
-| Key               | Description                      |
-| :---------------- | :------------------------------- |
-| <kbd>j</kbd>      | Next node                        |
-| <kbd>k</kbd>      | Previous node                    |
-| <kbd>n</kbd>      | Next file                        |
-| <kbd>p</kbd> / <kbd>N</kbd> | Previous file          |
-| <kbd>Ctrl-d</kbd> | Scroll the diff down             |
-| <kbd>Ctrl-u</kbd> | Scroll the diff up               |
-| <kbd>e</kbd>      | Toggle the file tree             |
-| <kbd>t</kbd>      | Search/go-to file                |
-| <kbd>y</kbd>      | Copy file path                   |
-| <kbd>i</kbd>      | Cycle icon style                 |
-| <kbd>o</kbd>      | Open file in $EDITOR             |
-| <kbd>s</kbd>      | Toggle side-by-side/unified view |
-| <kbd>Tab</kbd>    | Switch focus between the panes   |
-| <kbd>q</kbd>      | Quit                             |
+| Key               | Alias                          | Description                      |
+| :---------------- | :----------------------------- | :------------------------------- |
+| <kbd>j</kbd>      | <kbd>↓</kbd>                   | Next node                        |
+| <kbd>k</kbd>      | <kbd>↑</kbd>                   | Previous node                    |
+| <kbd>n</kbd>      |                                | Next file                        |
+| <kbd>p</kbd> / <kbd>N</kbd> |                       | Previous file                    |
+| <kbd>l</kbd>      | <kbd>→</kbd>                   | Expand and descend to child node |
+| <kbd>h</kbd>      | <kbd>←</kbd>                   | Ascend to and collapse parent    |
+| <kbd>Enter</kbd>  |                                | Toggle expand/collapse           |
+| <kbd>Ctrl-d</kbd> |                                | Scroll down (½ page)             |
+| <kbd>Ctrl-u</kbd> |                                | Scroll up (½ page)               |
+| <kbd>Ctrl-f</kbd> | <kbd>PgDn</kbd>                | Scroll down (full page)          |
+| <kbd>Ctrl-b</kbd> | <kbd>PgUp</kbd>                | Scroll up (full page)            |
+| <kbd>g</kbd>      | <kbd>Home</kbd>                | Scroll to top                    |
+| <kbd>G</kbd>      | <kbd>End</kbd>                 | Scroll to bottom                 |
+| <kbd>e</kbd>      |                                | Toggle the file tree             |
+| <kbd>F3</kbd> / <kbd>t</kbd> |                        | Filter files                     |
+| <kbd>y</kbd>      |                                | Copy file path                   |
+| <kbd>i</kbd>      |                                | Cycle icon style                 |
+| <kbd>o</kbd>      |                                | Edit file in $EDITOR             |
+| <kbd>s</kbd>      |                                | Toggle side-by-side/unified view |
+| <kbd>Tab</kbd>    |                                | Switch focus between the panes   |
+| <kbd>F1</kbd> / <kbd>?</kbd> |                      | Toggle help                      |
+| <kbd>Esc</kbd>    |                                | Cancel / quit                    |
+| <kbd>q</kbd>      |                                | Quit                             |
 
 ## Discord
 

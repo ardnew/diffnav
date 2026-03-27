@@ -14,7 +14,7 @@ type UIConfig struct {
 	HideFooter      bool   `yaml:"hideFooter"`
 	ShowFileTree    bool   `yaml:"showFileTree"`
 	FileTreeWidth   int    `yaml:"fileTreeWidth"`
-	SearchTreeWidth int    `yaml:"searchTreeWidth"`
+	FilterTreeWidth int    `yaml:"filterTreeWidth"`
 	Icons           string `yaml:"icons"`          // "nerd-fonts-status" (default), "nerd-fonts-simple", "nerd-fonts-filetype", "nerd-fonts-full", "unicode", "ascii"
 	ColorFileNames  bool   `yaml:"colorFileNames"` // Color filenames by git status (default: true)
 	ShowDiffStats   bool   `yaml:"showDiffStats"`  // Show the amount of lines added / removed next to the file
@@ -39,7 +39,7 @@ func DefaultConfig() Config {
 			HideFooter:      false,
 			ShowFileTree:    true,
 			FileTreeWidth:   30,
-			SearchTreeWidth: 50,
+			FilterTreeWidth: 50,
 			Icons:           "nerd-fonts-status",
 			ColorFileNames:  true,
 			SideBySide:      true,

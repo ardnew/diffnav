@@ -265,6 +265,21 @@ func (m *Model) GoToTop() {
 	m.vp.GotoTop()
 }
 
+// GoToBottom scrolls to the bottom of the diff.
+func (m *Model) GoToBottom() {
+	m.vp.GotoBottom()
+}
+
+// PageUp scrolls the viewport up by one full page.
+func (m *Model) PageUp() {
+	m.vp.PageUp()
+}
+
+// PageDown scrolls the viewport down by one full page.
+func (m *Model) PageDown() {
+	m.vp.PageDown()
+}
+
 // SetSideBySide updates the diff view mode and re-renders.
 func (m *Model) SetSideBySide(sideBySide bool) tea.Cmd {
 	m.sideBySide = sideBySide

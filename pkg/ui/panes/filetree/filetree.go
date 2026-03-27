@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/tree"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -48,21 +47,56 @@ func New(cfg config.Config) Model {
 	return m
 }
 
+// Update is intentionally a no-op. Key handling was previously performed here,
+// but it caused double-routing issues because BubbleTea dispatches messages to
+// both the parent and child models. All key handling is now centralized in the
+// top-level Update in pkg/ui/tui.go, which uses early returns to route each
+// key press exactly once.
 func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
-		switch {
-		case key.Matches(msg, keys.ExpandNode):
-			m.t.OpenCurrentNode()
+	return m, nil
+}
 
-		case key.Matches(msg, keys.CollapseNode):
-			m.t.CloseCurrentNode()
+// ExpandAndDescend opens the current node and moves the cursor to its first
+// child if one exists.
+func (m *Model) ExpandAndDescend() {
+	m.t.OpenCurrentNode()
+	curr := m.t.NodeAtCurrentOffset()
+	if curr != nil && curr.IsOpen() && len(curr.ChildNodes()) > 0 {
+		m.t.Down()
+	}
+}
 
-		case key.Matches(msg, keys.ToggleNode):
-			m.t.ToggleCurrentNode()
+// CollapseOrMoveToParent closes the current node if it is an open directory,
+// or moves the cursor to the parent directory otherwise.
+func (m *Model) CollapseOrMoveToParent() {
+	curr := m.t.NodeAtCurrentOffset()
+	if curr == nil {
+		return
+	}
+
+	// If the current node is an open directory, close it.
+	if _, ok := curr.GivenValue().(*dirnode.DirNode); ok && curr.IsOpen() {
+		m.t.CloseCurrentNode()
+		return
+	}
+
+	// Otherwise, navigate to the nearest ancestor directory.
+	currDepth := curr.Depth()
+	for i := len(m.t.AllNodes()) - 1; i >= 0; i-- {
+		node := m.t.AllNodes()[i]
+		if node.YOffset() >= curr.YOffset() {
+			continue
+		}
+		if _, ok := node.GivenValue().(*dirnode.DirNode); ok && node.Depth() < currDepth {
+			m.t.SetYOffset(node.YOffset())
+			return
 		}
 	}
-	return m, nil
+}
+
+// ToggleCurrentNode toggles the open/closed state of the current node.
+func (m *Model) ToggleCurrentNode() {
+	m.t.ToggleCurrentNode()
 }
 
 func (m *Model) View() string {
@@ -462,6 +496,26 @@ func (m *Model) ScrollUp(lines int) {
 func (m *Model) ScrollDown(lines int) {
 	newOffset := m.t.ViewportYOffset() + lines
 	m.t.SetViewportYOffset(newOffset)
+}
+
+// ScrollToTop scrolls to the top of the file tree.
+func (m *Model) ScrollToTop() {
+	m.t.GoToTop()
+}
+
+// ScrollToBottom scrolls to the bottom of the file tree.
+func (m *Model) ScrollToBottom() {
+	m.t.GoToBottom()
+}
+
+// PageUp scrolls the file tree up by one full page.
+func (m *Model) PageUp() {
+	m.t.PageUp()
+}
+
+// PageDown scrolls the file tree down by one full page.
+func (m *Model) PageDown() {
+	m.t.PageDown()
 }
 
 // SetIconStyle changes the icon style and regenerates the tree.
