@@ -30,11 +30,11 @@ type KeyMap struct {
 var keys = &KeyMap{
 	ExpandNode: key.NewBinding(
 		key.WithKeys("l", "right"),
-		key.WithHelp("l", "expand"),
+		key.WithHelp("→/l", "expand"),
 	),
 	CollapseNode: key.NewBinding(
 		key.WithKeys("h", "left"),
-		key.WithHelp("h", "collapse"),
+		key.WithHelp("←/h", "collapse"),
 	),
 	ToggleNode: key.NewBinding(
 		key.WithKeys("enter"),
@@ -66,27 +66,27 @@ var keys = &KeyMap{
 	),
 	CtrlF: key.NewBinding(
 		key.WithKeys("ctrl+f", "pgdown"),
-		key.WithHelp("ctrl+f", "page down"),
+		key.WithHelp("ctrl+f/PgDn", "page down"),
 	),
 	CtrlB: key.NewBinding(
 		key.WithKeys("ctrl+b", "pgup"),
-		key.WithHelp("ctrl+b", "page up"),
+		key.WithHelp("ctrl+b/PgUp", "page up"),
 	),
 	ScrollTop: key.NewBinding(
 		key.WithKeys("g", "home"),
-		key.WithHelp("g", "scroll to top"),
+		key.WithHelp("g/Home", "scroll to top"),
 	),
 	ScrollBottom: key.NewBinding(
 		key.WithKeys("G", "end"),
-		key.WithHelp("G", "scroll to bottom"),
+		key.WithHelp("G/End", "scroll to bottom"),
 	),
 	ToggleFileTree: key.NewBinding(
 		key.WithKeys("e"),
 		key.WithHelp("e", "toggle file tree"),
 	),
 	Search: key.NewBinding(
-		key.WithKeys("t"),
-		key.WithHelp("t", "search files"),
+		key.WithKeys("f3"),
+		key.WithHelp("F3", "filter files"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
@@ -102,7 +102,7 @@ var keys = &KeyMap{
 	),
 	OpenInEditor: key.NewBinding(
 		key.WithKeys("o"),
-		key.WithHelp("o", "open"),
+		key.WithHelp("o", "edit file"),
 	),
 	ToggleDiffView: key.NewBinding(
 		key.WithKeys("s"),
@@ -118,78 +118,38 @@ var keys = &KeyMap{
 	),
 }
 
-// aliasBindings maps bindings that have alias keys to copies with both
-// primary and alias key names shown in the help text.
-var aliasBindings = map[*key.Binding]key.Binding{
-	&keys.ExpandNode: key.NewBinding(
-		key.WithKeys("l", "right"),
-		key.WithHelp("l/→", "expand"),
-	),
-	&keys.CollapseNode: key.NewBinding(
-		key.WithKeys("h", "left"),
-		key.WithHelp("h/←", "collapse"),
-	),
-	&keys.CtrlF: key.NewBinding(
-		key.WithKeys("ctrl+f", "pgdown"),
-		key.WithHelp("ctrl+f/PgDn", "page down"),
-	),
-	&keys.CtrlB: key.NewBinding(
-		key.WithKeys("ctrl+b", "pgup"),
-		key.WithHelp("ctrl+b/PgUp", "page up"),
-	),
-	&keys.ScrollTop: key.NewBinding(
-		key.WithKeys("g", "home"),
-		key.WithHelp("g/Home", "scroll to top"),
-	),
-	&keys.ScrollBottom: key.NewBinding(
-		key.WithKeys("G", "end"),
-		key.WithHelp("G/End", "scroll to bottom"),
-	),
-}
-
-func keyGroupsWith(aliases bool) [][]key.Binding {
-	resolve := func(b *key.Binding) key.Binding {
-		if aliases {
-			if alias, ok := aliasBindings[b]; ok {
-				return alias
-			}
-		}
-		return *b
-	}
+func keyGroups() [][]key.Binding {
+	spacer := key.NewBinding(key.WithKeys(""), key.WithHelp(" ", " "))
 
 	return [][]key.Binding{{
-		resolve(&keys.SwitchPanel),
-		resolve(&keys.Up),
-		resolve(&keys.Down),
-		resolve(&keys.NextFile),
-		resolve(&keys.PrevFile),
-		resolve(&keys.ExpandNode),
-		resolve(&keys.CollapseNode),
-		resolve(&keys.ToggleNode),
+		keys.SwitchPanel,
+		keys.Up,
+		keys.Down,
+		keys.NextFile,
+		keys.PrevFile,
+		keys.ExpandNode,
+		keys.CollapseNode,
+		keys.ToggleNode,
+		spacer,
+		keys.CtrlD,
+		keys.CtrlU,
+		keys.CtrlF,
+		keys.CtrlB,
+		keys.ScrollTop,
+		keys.ScrollBottom,
 	}, {
-		resolve(&keys.CtrlD),
-		resolve(&keys.CtrlU),
-		resolve(&keys.CtrlF),
-		resolve(&keys.CtrlB),
-		resolve(&keys.ScrollTop),
-		resolve(&keys.ScrollBottom),
-	}, {
-		resolve(&keys.ToggleFileTree),
-		resolve(&keys.Search),
-		resolve(&keys.Copy),
-		resolve(&keys.OpenInEditor),
-		resolve(&keys.ToggleDiffView),
-		resolve(&keys.ToggleIconStyle),
-	}, {
-		resolve(&keys.ToggleHelp),
-		resolve(&keys.Quit),
+		keys.ToggleFileTree,
+		keys.Search,
+		keys.Copy,
+		keys.OpenInEditor,
+		keys.ToggleDiffView,
+		keys.ToggleIconStyle,
+		spacer,
+		keys.ToggleHelp,
+		keys.Quit,
 	}}
 }
 
 func KeyGroups() [][]key.Binding {
-	return keyGroupsWith(false)
-}
-
-func KeyGroupsAll() [][]key.Binding {
-	return keyGroupsWith(true)
+	return keyGroups()
 }

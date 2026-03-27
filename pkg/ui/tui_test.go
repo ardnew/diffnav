@@ -75,7 +75,7 @@ func TestHiddenTreeSearchEnterThenToggleDoesNotPanic(t *testing.T) {
 	m.height = 40
 
 	m = updateMainModel(t, m, tea.KeyPressMsg(tea.Key{Text: "e", Code: 'e'}))
-	m = updateMainModel(t, m, tea.KeyPressMsg(tea.Key{Text: "t", Code: 't'}))
+	m = updateMainModel(t, m, tea.KeyPressMsg(tea.Key{Code: tea.KeyF3}))
 	m = updateMainModel(t, m, tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	m = updateMainModel(t, m, tea.KeyPressMsg(tea.Key{Text: "e", Code: 'e'}))
 

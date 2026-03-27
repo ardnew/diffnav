@@ -76,7 +76,6 @@ type mainModel struct {
 	sideBySide        bool
 	help              help.Model
 	helpOpen          bool
-	helpShowAllKeys   bool
 }
 
 func New(input string, cfg config.Config) mainModel {
@@ -94,7 +93,7 @@ func New(input string, cfg config.Config) mainModel {
 	m.search.ShowSuggestions = true
 	m.search.KeyMap.AcceptSuggestion = key.NewBinding(key.WithKeys("tab"))
 	m.search.Prompt = " "
-	m.search.Placeholder = "Filter files 󰬛 "
+	m.search.Placeholder = "(F3) Filter files"
 	m.search.SetStyles(textinput.Styles{
 		Focused: textinput.StyleState{
 			Placeholder: lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
@@ -121,6 +120,30 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMouse(msg)
 	}
 
+	// Ignore key release events to prevent double-firing with enhanced
+	// keyboard reporting.
+	if _, ok := msg.(tea.KeyReleaseMsg); ok {
+		return m, nil
+	}
+
+	// Help toggle is always available, even while searching.
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
+		switch {
+		case key.Matches(msg, keys.ToggleHelp):
+			m.helpOpen = !m.helpOpen
+			if !m.helpOpen {
+				m.closeHelp()
+			}
+			return m, nil
+		case m.helpOpen && msg.Key().Code == tea.KeyEscape:
+			m.closeHelp()
+			return m, nil
+		case m.helpOpen:
+			// Block all other keys while help is open
+			return m, nil
+		}
+	}
+
 	if m.searching {
 		var sCmds []tea.Cmd
 		m, sCmds = m.searchUpdate(msg)
@@ -131,31 +154,9 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch {
-		case key.Matches(msg, keys.ToggleHelp):
-			m.helpOpen = !m.helpOpen
-			if !m.helpOpen {
-				m.closeHelp()
-			}
-			return m, tea.Batch(cmds...)
-		case m.helpOpen && msg.Key().Code == tea.KeyEscape:
-			m.closeHelp()
-			return m, tea.Batch(cmds...)
-		case m.helpOpen && key.Matches(msg, keys.Quit):
-			m.closeHelp()
-			return m, tea.Batch(cmds...)
-		case m.helpOpen && msg.String() == "/":
-			m.helpShowAllKeys = !m.helpShowAllKeys
-			if m.helpShowAllKeys {
-				m.help.SetKeys(KeyGroupsAll())
-			} else {
-				m.help.SetKeys(KeyGroups())
-			}
-			return m, tea.Batch(cmds...)
-		case m.helpOpen:
-			// Block all other keys while help is open
-			return m, tea.Batch(cmds...)
 		case msg.Key().Code == tea.KeyEscape:
-			return m, tea.Quit
+			// Esc does nothing when neither help nor search is active
+			return m, nil
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
 		case key.Matches(msg, keys.Search):
@@ -171,6 +172,7 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			dfCmd := m.diffViewer.SetSize(m.width-m.sidebarWidth(), m.mainContentHeight())
 			cmds = append(cmds, dfCmd, m.search.Focus())
+			return m, tea.Batch(cmds...)
 		case key.Matches(msg, keys.ToggleFileTree):
 			m.isShowingFileTree = !m.isShowingFileTree
 			sidebarWidth := m.sidebarWidth()
@@ -190,12 +192,15 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.search.SetWidth(m.searchWidth())
 			dfCmd := m.diffViewer.SetSize(m.width-sidebarWidth, h)
 			cmds = append(cmds, dfCmd)
+			return m, tea.Batch(cmds...)
 		case key.Matches(msg, keys.ToggleIconStyle):
 			m.cycleIconStyle()
+			return m, nil
 		case key.Matches(msg, keys.ToggleDiffView):
 			m.sideBySide = !m.sideBySide
 			cmd = m.diffViewer.SetSideBySide(m.sideBySide)
 			cmds = append(cmds, cmd)
+			return m, tea.Batch(cmds...)
 		case key.Matches(msg, keys.SwitchPanel):
 			if m.isShowingFileTree {
 				if m.activePanel == FileTreePanel {
@@ -204,36 +209,39 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.activePanel = FileTreePanel
 				}
 			}
+			return m, nil
 		case key.Matches(msg, keys.PrevFile):
 			m, cmd = m.moveToFile(-1)
 			cmds = append(cmds, cmd)
+			return m, tea.Batch(cmds...)
 		case key.Matches(msg, keys.NextFile):
 			m, cmd = m.moveToFile(1)
 			cmds = append(cmds, cmd)
+			return m, tea.Batch(cmds...)
+
+		// Scroll-oriented keybindings always operate on the diff viewer.
 		case key.Matches(msg, keys.ScrollTop):
-			if m.activePanel == FileTreePanel {
-				m.fileTree.ScrollToTop()
-			} else {
-				m.diffViewer.GoToTop()
-			}
+			m.diffViewer.GoToTop()
+			return m, nil
 		case key.Matches(msg, keys.ScrollBottom):
-			if m.activePanel == FileTreePanel {
-				m.fileTree.ScrollToBottom()
-			} else {
-				m.diffViewer.GoToBottom()
-			}
+			m.diffViewer.GoToBottom()
+			return m, nil
 		case key.Matches(msg, keys.CtrlF):
-			if m.activePanel == FileTreePanel {
-				m.fileTree.PageDown()
-			} else {
-				m.diffViewer.PageDown()
-			}
+			m.diffViewer.PageDown()
+			return m, nil
 		case key.Matches(msg, keys.CtrlB):
-			if m.activePanel == FileTreePanel {
-				m.fileTree.PageUp()
-			} else {
-				m.diffViewer.PageUp()
-			}
+			m.diffViewer.PageUp()
+			return m, nil
+		case key.Matches(msg, keys.CtrlD):
+			m.diffViewer, cmd = m.diffViewer.Update(msg)
+			cmds = append(cmds, cmd)
+			return m, tea.Batch(cmds...)
+		case key.Matches(msg, keys.CtrlU):
+			m.diffViewer, cmd = m.diffViewer.Update(msg)
+			cmds = append(cmds, cmd)
+			return m, tea.Batch(cmds...)
+
+		// Tree traversal keys operate on whichever view is active.
 		case key.Matches(msg, keys.Up):
 			if m.activePanel == FileTreePanel {
 				m, cmd = m.moveCursor(-1)
@@ -241,6 +249,7 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.diffViewer.ScrollUp(1)
 			}
+			return m, tea.Batch(cmds...)
 		case key.Matches(msg, keys.Down):
 			if m.activePanel == FileTreePanel {
 				m, cmd = m.moveCursor(1)
@@ -248,16 +257,49 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.diffViewer.ScrollDown(1)
 			}
+			return m, tea.Batch(cmds...)
+
+		// Expand/collapse/toggle operate on the file tree.
+		case key.Matches(msg, keys.ExpandNode):
+			if m.activePanel == FileTreePanel {
+				m.fileTree.ExpandAndDescend()
+				node := m.fileTree.GetCurrNode()
+				m, cmd = m.setNodeDiff(node)
+				cmds = append(cmds, cmd)
+				m.diffViewer.GoToTop()
+			}
+			return m, tea.Batch(cmds...)
+		case key.Matches(msg, keys.CollapseNode):
+			if m.activePanel == FileTreePanel {
+				m.fileTree.CollapseOrMoveToParent()
+				node := m.fileTree.GetCurrNode()
+				m, cmd = m.setNodeDiff(node)
+				cmds = append(cmds, cmd)
+				m.diffViewer.GoToTop()
+			}
+			return m, tea.Batch(cmds...)
+		case key.Matches(msg, keys.ToggleNode):
+			if m.activePanel == FileTreePanel {
+				m.fileTree.ToggleCurrentNode()
+				node := m.fileTree.GetCurrNode()
+				m, cmd = m.setNodeDiff(node)
+				cmds = append(cmds, cmd)
+				m.diffViewer.GoToTop()
+			}
+			return m, tea.Batch(cmds...)
+
 		case key.Matches(msg, keys.Copy):
 			cmd = m.fileTree.CopyCurrNodePath()
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
+			return m, tea.Batch(cmds...)
 		case key.Matches(msg, keys.OpenInEditor):
 			cmd = m.openInEditor()
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
+			return m, tea.Batch(cmds...)
 		}
 
 	case tea.WindowSizeMsg:
@@ -288,28 +330,15 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		log.Fatal(msg.Err)
 	}
 
-	// Route messages: key messages go only to active panel, other messages go to both.
-	// Exception: ctrl+d/ctrl+u always go to diffViewer for scrolling.
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+d", "ctrl+u":
-			m.diffViewer, cmd = m.diffViewer.Update(msg)
-			cmds = append(cmds, cmd)
-		default:
-			if m.activePanel == DiffViewerPanel {
-				m.diffViewer, cmd = m.diffViewer.Update(msg)
-				cmds = append(cmds, cmd)
-			} else {
-				m.fileTree.Update(msg)
-				cmds = append(cmds, cmd)
-			}
-		}
+	// Route non-key messages to sub-components for internal processing
+	// (e.g. diffContentMsg).
+	switch msg.(type) {
+	case tea.KeyPressMsg, tea.KeyReleaseMsg:
+		// Already handled above; do not forward again.
 	default:
 		m.diffViewer, cmd = m.diffViewer.Update(msg)
 		cmds = append(cmds, cmd)
 		m.fileTree.Update(msg)
-		cmds = append(cmds, cmd)
 	}
 
 	return m, tea.Batch(cmds...)
@@ -340,9 +369,15 @@ func (m *mainModel) cycleIconStyle() {
 func (m mainModel) searchUpdate(msg tea.Msg) (mainModel, []tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
+
+	// Ignore key release events.
+	if _, ok := msg.(tea.KeyReleaseMsg); ok {
+		return m, nil
+	}
+
 	if m.search.Focused() {
 		switch msg := msg.(type) {
-		case tea.KeyMsg:
+		case tea.KeyPressMsg:
 			switch msg.String() {
 			case "esc":
 				m.stopSearch()
@@ -395,7 +430,6 @@ func (m mainModel) View() tea.View {
 	view.AltScreen = true
 	view.MouseMode = tea.MouseModeAllMotion
 
-	view.KeyboardEnhancements.ReportEventTypes = true
 	// Determine colors based on active panel.
 	leftColor := lipgloss.Color("8")
 	rightColor := lipgloss.Color("8")
@@ -593,8 +627,6 @@ func (m *mainModel) stopSearch() {
 
 func (m *mainModel) closeHelp() {
 	m.helpOpen = false
-	m.helpShowAllKeys = false
-	m.help.SetKeys(KeyGroups())
 }
 
 func (m mainModel) openInEditor() tea.Cmd {
