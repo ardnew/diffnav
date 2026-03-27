@@ -33,9 +33,9 @@ const (
 	filterHeight  = 3
 
 	// Zone IDs for bubblezone click detection.
-	zoneFilterBox     = "searchbox"
+	zoneFilterBox     = "filterbox"
 	zoneFileTree      = "filetree"
-	zoneFilterResults = "searchresults"
+	zoneFilterResults = "filterresults"
 	zoneDiffViewer    = "diffviewer"
 
 	// Sidebar resize detection threshold in pixels.

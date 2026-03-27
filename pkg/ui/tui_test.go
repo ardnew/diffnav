@@ -263,7 +263,7 @@ func TestEscCancelsFilterMode(t *testing.T) {
 	m = updateMainModel(t, m, escMsg())
 
 	if m.filtering {
-		t.Fatal("expected Esc to cancel filter/filter mode")
+		t.Fatal("expected Esc to cancel filter mode")
 	}
 }
 
