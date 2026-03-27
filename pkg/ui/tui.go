@@ -580,21 +580,34 @@ func (m mainModel) footerView() string {
 
 func (m mainModel) resultsView() string {
 	sb := strings.Builder{}
+	query := m.search.Value()
 	for i, f := range m.filtered {
 		fName := utils.TruncateString(" "+f, m.config.UI.SearchTreeWidth-2)
+		base := lipgloss.NewStyle()
 		if i == m.resultsCursor {
-			sb.WriteString(
-				lipgloss.NewStyle().
-					Background(lipgloss.Color("#1b1b33")).
-					Bold(true).
-					Render(fName) +
-					"\n",
-			)
-		} else {
-			sb.WriteString(fName + "\n")
+			base = base.Background(lipgloss.Color("#1b1b33")).Bold(true)
 		}
+		sb.WriteString(highlightMatch(fName, query, base) + "\n")
 	}
 	return sb.String()
+}
+
+// highlightMatch renders s with the first case-insensitive occurrence of query
+// underlined. If query is empty or not found the full string is returned
+// styled with base only.
+func highlightMatch(s, query string, base lipgloss.Style) string {
+	if query == "" {
+		return base.Render(s)
+	}
+	idx := strings.Index(strings.ToLower(s), strings.ToLower(query))
+	if idx < 0 {
+		return base.Render(s)
+	}
+	before := s[:idx]
+	match := s[idx : idx+len(query)]
+	after := s[idx+len(query):]
+	hl := base.Copy().Underline(true)
+	return base.Render(before) + hl.Render(match) + base.Render(after)
 }
 
 func (m mainModel) sidebarWidth() int {

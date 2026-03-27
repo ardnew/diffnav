@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bluekeyes/go-gitdiff/gitdiff"
+	"github.com/charmbracelet/x/ansi"
 	zone "github.com/lrstanley/bubblezone/v2"
 
 	"github.com/dlvhdr/diffnav/pkg/config"
@@ -303,5 +305,47 @@ func TestEscHelpTakesPriorityOverDiffView(t *testing.T) {
 	}
 	if m.activePanel != DiffViewerPanel {
 		t.Fatal("expected diff viewer to still be active after closing help")
+	}
+}
+
+func TestHighlightMatchUnderlines(t *testing.T) {
+	base := lipgloss.NewStyle()
+	result := highlightMatch("football", "foo", base)
+	stripped := ansi.Strip(result)
+	// After stripping ANSI codes, the full text should be present.
+	if stripped != "football" {
+		t.Fatalf("expected stripped result to be %q, got %q", "football", stripped)
+	}
+	// The raw output must contain ANSI underline escape (SGR 4).
+	if !strings.Contains(result, "\x1b[") {
+		t.Fatal("expected ANSI escape codes for underline styling")
+	}
+}
+
+func TestHighlightMatchCaseInsensitive(t *testing.T) {
+	base := lipgloss.NewStyle()
+	result := highlightMatch("Football", "foo", base)
+	stripped := ansi.Strip(result)
+	// Original case should be preserved.
+	if !strings.Contains(stripped, "Foo") {
+		t.Fatalf("expected stripped result to contain %q, got %q", "Foo", stripped)
+	}
+}
+
+func TestHighlightMatchEmptyQuery(t *testing.T) {
+	base := lipgloss.NewStyle()
+	result := highlightMatch("football", "", base)
+	stripped := ansi.Strip(result)
+	if stripped != "football" {
+		t.Fatalf("expected stripped result to be %q, got %q", "football", stripped)
+	}
+}
+
+func TestHighlightMatchNoMatch(t *testing.T) {
+	base := lipgloss.NewStyle()
+	result := highlightMatch("football", "xyz", base)
+	stripped := ansi.Strip(result)
+	if stripped != "football" {
+		t.Fatalf("expected stripped result to be %q, got %q", "football", stripped)
 	}
 }
