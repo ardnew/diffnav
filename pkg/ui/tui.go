@@ -121,8 +121,9 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMouse(msg)
 	}
 
-	// Ignore key release events to prevent double-firing with enhanced
-	// keyboard reporting.
+	// Filter out key release events to prevent double-firing.
+	// bubbletea/v2 generates both KeyPressMsg and KeyReleaseMsg as standard
+	// events (not Kitty Keyboard Protocol); we only handle key presses.
 	if _, ok := msg.(tea.KeyReleaseMsg); ok {
 		return m, nil
 	}
@@ -386,7 +387,7 @@ func (m mainModel) filterUpdate(msg tea.Msg) (mainModel, []tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
-	// Ignore key release events.
+	// Filter out key release events to prevent double-firing.
 	if _, ok := msg.(tea.KeyReleaseMsg); ok {
 		return m, nil
 	}
