@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"unicode/utf8"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
@@ -597,17 +598,37 @@ func (m mainModel) resultsView() string {
 // highlightMatch renders s with the first case-insensitive occurrence of query
 // underlined. If query is empty or not found the full string is returned
 // styled with base only.
+//
+// The match position is computed by scanning s rune-by-rune and comparing with
+// strings.EqualFold. This avoids the byte-offset mismatch that can occur when
+// strings.ToLower changes byte lengths for certain Unicode characters (e.g.
+// Kelvin sign U+212A lowercases to ASCII 'k').
 func highlightMatch(s, query string, base lipgloss.Style) string {
 	if query == "" {
 		return base.Render(s)
 	}
-	before, _, found := strings.Cut(strings.ToLower(s), strings.ToLower(query))
-	if !found {
-		return base.Render(s)
+	qRunes := utf8.RuneCountInString(query)
+	// Slide a window of qRunes runes across s, comparing with EqualFold.
+	i := 0
+	for i < len(s) {
+		// Advance j past qRunes runes starting at i.
+		j := i
+		for n := 0; n < qRunes && j < len(s); n++ {
+			_, size := utf8.DecodeRuneInString(s[j:])
+			j += size
+		}
+		if j > len(s) {
+			break
+		}
+		if strings.EqualFold(s[i:j], query) {
+			hl := base.Copy().Underline(true)
+			return base.Render(s[:i]) + hl.Render(s[i:j]) + base.Render(s[j:])
+		}
+		// Advance i by one rune.
+		_, size := utf8.DecodeRuneInString(s[i:])
+		i += size
 	}
-	n := len(before)
-	hl := base.Copy().Underline(true)
-	return base.Render(s[:n]) + hl.Render(s[n:n+len(query)]) + base.Render(s[n+len(query):])
+	return base.Render(s)
 }
 
 func (m mainModel) sidebarWidth() int {

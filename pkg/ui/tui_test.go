@@ -355,3 +355,15 @@ func TestHighlightMatchNoMatch(t *testing.T) {
 		t.Fatalf("expected stripped result to be %q, got %q", "football", stripped)
 	}
 }
+
+func TestHighlightMatchUnicodeSafe(t *testing.T) {
+	base := lipgloss.NewStyle()
+	// The Kelvin sign (U+212A, 3 bytes) case-folds to ASCII 'k' (1 byte).
+	// This must not panic or produce garbled output.
+	s := "file\u212Aname"
+	result := highlightMatch(s, "k", base)
+	stripped := ansi.Strip(result)
+	if stripped != s {
+		t.Fatalf("expected stripped result to be %q, got %q", s, stripped)
+	}
+}
