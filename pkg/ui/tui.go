@@ -246,13 +246,11 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.diffViewer.PageUp()
 			return m, nil
 		case key.Matches(msg, keys.CtrlD):
-			m.diffViewer, cmd = m.diffViewer.Update(msg)
-			cmds = append(cmds, cmd)
-			return m, tea.Batch(cmds...)
+			m.diffViewer.PageDown()
+			return m, nil
 		case key.Matches(msg, keys.CtrlU):
-			m.diffViewer, cmd = m.diffViewer.Update(msg)
-			cmds = append(cmds, cmd)
-			return m, tea.Batch(cmds...)
+			m.diffViewer.PageUp()
+			return m, nil
 
 		// Tree traversal keys operate on whichever view is active.
 		case key.Matches(msg, keys.Up):
