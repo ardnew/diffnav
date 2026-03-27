@@ -207,3 +207,101 @@ func updateMainModel(t *testing.T, m mainModel, msg tea.Msg) mainModel {
 
 	return result
 }
+
+func escMsg() tea.KeyPressMsg {
+	return tea.KeyPressMsg(tea.Key{Code: tea.KeyEscape})
+}
+
+// TestEscDismissesHelpPopover verifies priority 1: when the help popover is
+// visible, Esc dismisses it.
+func TestEscDismissesHelpPopover(t *testing.T) {
+	m := newTestMainModel(t)
+	m.width = 100
+	m.height = 40
+	m.helpOpen = true
+
+	m = updateMainModel(t, m, escMsg())
+
+	if m.helpOpen {
+		t.Fatal("expected help popover to be closed after pressing Esc")
+	}
+}
+
+// TestEscSwitchesFromDiffViewToExplorer verifies priority 2: when the diff
+// view pane is active, Esc activates the explorer pane.
+func TestEscSwitchesFromDiffViewToExplorer(t *testing.T) {
+	m := newTestMainModel(t)
+	m.width = 100
+	m.height = 40
+	m.activePanel = DiffViewerPanel
+
+	m = updateMainModel(t, m, escMsg())
+
+	if m.activePanel != FileTreePanel {
+		t.Fatal("expected Esc to switch from diff viewer to file tree panel")
+	}
+}
+
+// TestEscCancelsSearchMode verifies priority 3: when filter files mode is
+// active (with explorer pane focused), Esc returns to normal tree explorer.
+func TestEscCancelsSearchMode(t *testing.T) {
+	m := newTestMainModel(t)
+	m.width = 100
+	m.height = 40
+	m.searching = true
+	m.activePanel = FileTreePanel
+	m.search.Focus()
+
+	m = updateMainModel(t, m, escMsg())
+
+	if m.searching {
+		t.Fatal("expected Esc to cancel search/filter mode")
+	}
+}
+
+// TestEscDiffViewTakesPriorityOverSearch verifies that when the diff view is
+// active during search, Esc first switches to the explorer pane (priority 2)
+// before stopping search (priority 3).
+func TestEscDiffViewTakesPriorityOverSearch(t *testing.T) {
+	m := newTestMainModel(t)
+	m.width = 100
+	m.height = 40
+	m.searching = true
+	m.activePanel = DiffViewerPanel
+	m.search.Focus()
+
+	m = updateMainModel(t, m, escMsg())
+
+	if m.activePanel != FileTreePanel {
+		t.Fatal("expected Esc to switch from diff viewer to file tree panel first")
+	}
+	if !m.searching {
+		t.Fatal("expected search to remain active after first Esc (diff view priority)")
+	}
+
+	// Second Esc should cancel search.
+	m = updateMainModel(t, m, escMsg())
+
+	if m.searching {
+		t.Fatal("expected second Esc to cancel search mode")
+	}
+}
+
+// TestEscHelpTakesPriorityOverDiffView verifies that when the help popover is
+// visible with diff view active, Esc first closes help (priority 1).
+func TestEscHelpTakesPriorityOverDiffView(t *testing.T) {
+	m := newTestMainModel(t)
+	m.width = 100
+	m.height = 40
+	m.helpOpen = true
+	m.activePanel = DiffViewerPanel
+
+	m = updateMainModel(t, m, escMsg())
+
+	if m.helpOpen {
+		t.Fatal("expected help popover to be closed after pressing Esc")
+	}
+	if m.activePanel != DiffViewerPanel {
+		t.Fatal("expected diff viewer to still be active after closing help")
+	}
+}

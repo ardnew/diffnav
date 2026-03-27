@@ -18,6 +18,7 @@ type KeyMap struct {
 	ScrollBottom    key.Binding
 	ToggleFileTree  key.Binding
 	Search          key.Binding
+	Escape          key.Binding
 	Quit            key.Binding
 	Copy            key.Binding
 	SwitchPanel     key.Binding
@@ -88,6 +89,10 @@ var keys = &KeyMap{
 		key.WithKeys("f3"),
 		key.WithHelp("F3", "filter files"),
 	),
+	Escape: key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("Esc", "cancel / quit"),
+	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
 		key.WithHelp("q", "quit"),
@@ -146,6 +151,7 @@ func keyGroups() [][]key.Binding {
 		keys.ToggleIconStyle,
 		spacer,
 		keys.ToggleHelp,
+		keys.Escape,
 		keys.Quit,
 	}}
 }

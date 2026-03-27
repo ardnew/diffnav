@@ -165,7 +165,7 @@ If you want the exact delta configuration I'm using - [it can be found here](htt
 | <kbd>s</kbd>      |                                | Toggle side-by-side/unified view |
 | <kbd>Tab</kbd>    |                                | Switch focus between the panes   |
 | <kbd>F1</kbd> / <kbd>?</kbd> |                      | Toggle help                      |
-| <kbd>Esc</kbd>    |                                | Close help / Cancel filter       |
+| <kbd>Esc</kbd>    |                                | Cancel / quit                    |
 | <kbd>q</kbd>      |                                | Quit                             |
 
 ## Discord

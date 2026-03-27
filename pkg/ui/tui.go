@@ -135,12 +135,28 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.closeHelp()
 			}
 			return m, nil
-		case m.helpOpen && msg.Key().Code == tea.KeyEscape:
+		case m.helpOpen && key.Matches(msg, keys.Escape):
 			m.closeHelp()
 			return m, nil
 		case m.helpOpen:
 			// Block all other keys while help is open
 			return m, nil
+
+		// Esc priority chain (help already handled above):
+		// 2. Diff view active → activate explorer pane
+		// 3. Filter files mode → return to normal tree explorer
+		// 4. Otherwise → quit
+		case key.Matches(msg, keys.Escape):
+			if m.activePanel == DiffViewerPanel {
+				m.activePanel = FileTreePanel
+				return m, nil
+			}
+			if m.searching {
+				m.stopSearch()
+				dfCmd := m.diffViewer.SetSize(m.width-m.sidebarWidth(), m.mainContentHeight())
+				return m, dfCmd
+			}
+			return m, tea.Quit
 		}
 	}
 
@@ -154,9 +170,6 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch {
-		case msg.Key().Code == tea.KeyEscape:
-			// Esc does nothing when neither help nor search is active
-			return m, nil
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
 		case key.Matches(msg, keys.Search):
@@ -379,10 +392,6 @@ func (m mainModel) searchUpdate(msg tea.Msg) (mainModel, []tea.Cmd) {
 		switch msg := msg.(type) {
 		case tea.KeyPressMsg:
 			switch msg.String() {
-			case "esc":
-				m.stopSearch()
-				dfCmd := m.diffViewer.SetSize(m.width-m.sidebarWidth(), m.mainContentHeight())
-				cmds = append(cmds, dfCmd)
 			case "ctrl+c":
 				return m, []tea.Cmd{tea.Quit}
 			case "enter":
