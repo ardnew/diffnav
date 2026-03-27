@@ -143,13 +143,17 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		// Esc priority chain (help already handled above):
-		// 2. Diff view active → activate explorer pane
+		// 2. Diff view active → activate explorer pane (when visible)
 		// 3. Filter files mode → return to normal tree explorer
 		// 4. Otherwise → quit
 		case key.Matches(msg, keys.Escape):
 			if m.activePanel == DiffViewerPanel {
-				m.activePanel = FileTreePanel
-				return m, nil
+				// Only switch focus to the file tree if it is currently visible.
+				if m.isShowingFileTree {
+					m.activePanel = FileTreePanel
+					return m, nil
+				}
+				// If the file tree is hidden, do not switch focus to a non-visible pane.
 			}
 			if m.filtering {
 				m.stopFilter()
