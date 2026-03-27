@@ -14,67 +14,73 @@ import (
 	"github.com/dlvhdr/diffnav/pkg/config"
 )
 
-func TestSearchUpdateEnterWithNoResultsDoesNotPanic(t *testing.T) {
+// Default terminal dimensions used across tests.
+const (
+	testTermWidth  = 100
+	testTermHeight = 40
+)
+
+func TestFilterUpdateEnterWithNoResultsDoesNotPanic(t *testing.T) {
 	m := newTestMainModel(t)
-	m.width = 100
-	m.height = 40
-	m.searching = true
-	m.search.Focus()
-	m.search.SetValue("does-not-match")
-	m.setSearchResults()
+	m.width = testTermWidth
+	m.height = testTermHeight
+	m.filtering = true
+	m.filter.Focus()
+	m.filter.SetValue("does-not-match")
+	m.setFilterResults()
 
-	updated, _ := m.searchUpdate(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	updated, _ := m.filterUpdate(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 
-	if updated.searching {
-		t.Fatal("expected search to stop after pressing enter")
+	if updated.filtering {
+		t.Fatal("expected filter to stop after pressing enter")
 	}
 	if updated.resultsCursor != 0 {
 		t.Fatalf("expected cursor to remain at 0, got %d", updated.resultsCursor)
 	}
 }
 
-func TestSearchUpdateKeepsCursorValidWhenResultsAreEmpty(t *testing.T) {
+func TestFilterUpdateKeepsCursorValidWhenResultsAreEmpty(t *testing.T) {
 	m := newTestMainModel(t)
-	m.searching = true
-	m.search.Focus()
+	m.filtering = true
+	m.filter.Focus()
 	m.filtered = nil
 	m.resultsCursor = 0
 
-	updated, _ := m.searchUpdate(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	updated, _ := m.filterUpdate(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	if updated.resultsCursor != 0 {
 		t.Fatalf("expected cursor to remain at 0 after down on empty results, got %d", updated.resultsCursor)
 	}
 
 	updated.resultsCursor = -3
-	updated.search.SetValue("does-not-match")
-	updated.setSearchResults()
+	updated.filter.SetValue("does-not-match")
+	updated.setFilterResults()
 	if updated.resultsCursor != 0 {
 		t.Fatalf("expected cursor to clamp to 0 for empty results, got %d", updated.resultsCursor)
 	}
 }
 
-func TestSearchResultsRenderWhenFileTreeIsHidden(t *testing.T) {
+func TestFilterResultsRenderWhenFileTreeIsHidden(t *testing.T) {
 	m := newTestMainModel(t)
-	m.width = 100
-	m.height = 40
+	m.width = testTermWidth
+	m.height = testTermHeight
 	m.isShowingFileTree = false
-	m.searching = true
-	m.search.SetWidth(m.searchWidth())
-	m.setSearchResults()
-	m.resultsVp.SetWidth(m.config.UI.SearchTreeWidth)
-	m.resultsVp.SetHeight(m.mainContentHeight() - searchHeight)
+	m.filtering = true
+	m.filter.SetWidth(m.filterWidth())
+	m.setFilterResults()
+	m.resultsVp.SetWidth(m.config.UI.FilterTreeWidth)
+	m.resultsVp.SetHeight(m.mainContentHeight() - filterHeight)
 	m.resultsVp.SetContent(m.resultsView())
 
 	view := m.View().Content
 	if !strings.Contains(view, "yarn.lock") {
-		t.Fatal("expected search results to be visible even when the file tree is hidden")
+		t.Fatal("expected filter results to be visible even when the file tree is hidden")
 	}
 }
 
-func TestHiddenTreeSearchEnterThenToggleDoesNotPanic(t *testing.T) {
+func TestHiddenTreeFilterEnterThenToggleDoesNotPanic(t *testing.T) {
 	m := newTestMainModel(t)
-	m.width = 100
-	m.height = 40
+	m.width = testTermWidth
+	m.height = testTermHeight
 
 	m = updateMainModel(t, m, tea.KeyPressMsg(tea.Key{Text: "e", Code: 'e'}))
 	m = updateMainModel(t, m, tea.KeyPressMsg(tea.Key{Code: tea.KeyF3}))
@@ -84,18 +90,18 @@ func TestHiddenTreeSearchEnterThenToggleDoesNotPanic(t *testing.T) {
 	if !m.isShowingFileTree {
 		t.Fatal("expected file tree to be visible after toggling it back on")
 	}
-	if m.search.Width() < 0 {
-		t.Fatalf("expected non-negative search width, got %d", m.search.Width())
+	if m.filter.Width() < 0 {
+		t.Fatalf("expected non-negative filter width, got %d", m.filter.Width())
 	}
 	_ = m.View().Content
 }
 
-func TestHiddenTreeSearchClickNearLeftEdgeDoesNotShowFileTree(t *testing.T) {
+func TestHiddenTreeFilterClickNearLeftEdgeDoesNotShowFileTree(t *testing.T) {
 	m := newTestMainModel(t)
-	m.width = 100
-	m.height = 40
+	m.width = testTermWidth
+	m.height = testTermHeight
 	m.isShowingFileTree = false
-	m.searching = true
+	m.filtering = true
 
 	updated, _ := m.handleMouse(tea.MouseClickMsg(tea.Mouse{X: 1, Y: 1, Button: tea.MouseLeft}))
 
@@ -104,16 +110,16 @@ func TestHiddenTreeSearchClickNearLeftEdgeDoesNotShowFileTree(t *testing.T) {
 		t.Fatalf("unexpected model type %T", updated)
 	}
 	if result.isShowingFileTree {
-		t.Fatal("expected left-edge click during hidden-tree search to leave the file tree hidden")
+		t.Fatal("expected left-edge click during hidden-tree filter to leave the file tree hidden")
 	}
 }
 
-func TestHiddenSidebarGrabStillShowsFileTreeWhenNotSearching(t *testing.T) {
+func TestHiddenSidebarGrabStillShowsFileTreeWhenNotFiltering(t *testing.T) {
 	m := newTestMainModel(t)
-	m.width = 100
-	m.height = 40
+	m.width = testTermWidth
+	m.height = testTermHeight
 	m.isShowingFileTree = false
-	m.searching = false
+	m.filtering = false
 
 	updated, _ := m.handleMouse(tea.MouseClickMsg(tea.Mouse{X: 1, Y: 1, Button: tea.MouseLeft}))
 
@@ -126,13 +132,13 @@ func TestHiddenSidebarGrabStillShowsFileTreeWhenNotSearching(t *testing.T) {
 	}
 }
 
-func TestSearchSidebarBorderClickDoesNotStartDragging(t *testing.T) {
+func TestFilterSidebarBorderClickDoesNotStartDragging(t *testing.T) {
 	m := newTestMainModel(t)
-	m.width = 100
-	m.height = 40
+	m.width = testTermWidth
+	m.height = testTermHeight
 	m.isShowingFileTree = true
-	m.searching = true
-	m.fileTree.SetSize(m.config.UI.FileTreeWidth, m.mainContentHeight()-searchHeight)
+	m.filtering = true
+	m.fileTree.SetSize(m.config.UI.FileTreeWidth, m.mainContentHeight()-filterHeight)
 
 	updated, _ := m.handleMouse(tea.MouseClickMsg(tea.Mouse{
 		X:      m.sidebarWidth(),
@@ -145,18 +151,18 @@ func TestSearchSidebarBorderClickDoesNotStartDragging(t *testing.T) {
 		t.Fatalf("unexpected model type %T", updated)
 	}
 	if result.draggingSidebar {
-		t.Fatal("expected sidebar dragging to stay disabled while searching")
+		t.Fatal("expected sidebar dragging to stay disabled while filtering")
 	}
 }
 
-func TestSearchSidebarDragMotionIsIgnored(t *testing.T) {
+func TestFilterSidebarDragMotionIsIgnored(t *testing.T) {
 	m := newTestMainModel(t)
-	m.width = 100
-	m.height = 40
+	m.width = testTermWidth
+	m.height = testTermHeight
 	m.isShowingFileTree = true
-	m.searching = true
+	m.filtering = true
 	m.draggingSidebar = true
-	m.fileTree.SetSize(m.config.UI.FileTreeWidth, m.mainContentHeight()-searchHeight)
+	m.fileTree.SetSize(m.config.UI.FileTreeWidth, m.mainContentHeight()-filterHeight)
 
 	updated, _ := m.handleMouse(tea.MouseMotionMsg(tea.Mouse{
 		X:      40,
@@ -169,7 +175,7 @@ func TestSearchSidebarDragMotionIsIgnored(t *testing.T) {
 		t.Fatalf("unexpected model type %T", updated)
 	}
 	if result.draggingSidebar {
-		t.Fatal("expected search-mode drag motion to clear dragging state")
+		t.Fatal("expected filter-mode drag motion to clear dragging state")
 	}
 	if result.fileTree.Width() != m.fileTree.Width() {
 		t.Fatalf("expected file tree width to remain %d, got %d", m.fileTree.Width(), result.fileTree.Width())
@@ -218,8 +224,8 @@ func escMsg() tea.KeyPressMsg {
 // visible, Esc dismisses it.
 func TestEscDismissesHelpPopover(t *testing.T) {
 	m := newTestMainModel(t)
-	m.width = 100
-	m.height = 40
+	m.width = testTermWidth
+	m.height = testTermHeight
 	m.helpOpen = true
 
 	m = updateMainModel(t, m, escMsg())
@@ -233,8 +239,8 @@ func TestEscDismissesHelpPopover(t *testing.T) {
 // view pane is active, Esc activates the explorer pane.
 func TestEscSwitchesFromDiffViewToExplorer(t *testing.T) {
 	m := newTestMainModel(t)
-	m.width = 100
-	m.height = 40
+	m.width = testTermWidth
+	m.height = testTermHeight
 	m.activePanel = DiffViewerPanel
 
 	m = updateMainModel(t, m, escMsg())
@@ -244,48 +250,48 @@ func TestEscSwitchesFromDiffViewToExplorer(t *testing.T) {
 	}
 }
 
-// TestEscCancelsSearchMode verifies priority 3: when filter files mode is
+// TestEscCancelsFilterMode verifies priority 3: when filter files mode is
 // active (with explorer pane focused), Esc returns to normal tree explorer.
-func TestEscCancelsSearchMode(t *testing.T) {
+func TestEscCancelsFilterMode(t *testing.T) {
 	m := newTestMainModel(t)
-	m.width = 100
-	m.height = 40
-	m.searching = true
+	m.width = testTermWidth
+	m.height = testTermHeight
+	m.filtering = true
 	m.activePanel = FileTreePanel
-	m.search.Focus()
+	m.filter.Focus()
 
 	m = updateMainModel(t, m, escMsg())
 
-	if m.searching {
-		t.Fatal("expected Esc to cancel search/filter mode")
+	if m.filtering {
+		t.Fatal("expected Esc to cancel filter/filter mode")
 	}
 }
 
-// TestEscDiffViewTakesPriorityOverSearch verifies that when the diff view is
-// active during search, Esc first switches to the explorer pane (priority 2)
-// before stopping search (priority 3).
-func TestEscDiffViewTakesPriorityOverSearch(t *testing.T) {
+// TestEscDiffViewTakesPriorityOverFilter verifies that when the diff view is
+// active during filtering, Esc first switches to the explorer pane (priority 2)
+// before stopping filter (priority 3).
+func TestEscDiffViewTakesPriorityOverFilter(t *testing.T) {
 	m := newTestMainModel(t)
-	m.width = 100
-	m.height = 40
-	m.searching = true
+	m.width = testTermWidth
+	m.height = testTermHeight
+	m.filtering = true
 	m.activePanel = DiffViewerPanel
-	m.search.Focus()
+	m.filter.Focus()
 
 	m = updateMainModel(t, m, escMsg())
 
 	if m.activePanel != FileTreePanel {
 		t.Fatal("expected Esc to switch from diff viewer to file tree panel first")
 	}
-	if !m.searching {
-		t.Fatal("expected search to remain active after first Esc (diff view priority)")
+	if !m.filtering {
+		t.Fatal("expected filter to remain active after first Esc (diff view priority)")
 	}
 
-	// Second Esc should cancel search.
+	// Second Esc should cancel filter.
 	m = updateMainModel(t, m, escMsg())
 
-	if m.searching {
-		t.Fatal("expected second Esc to cancel search mode")
+	if m.filtering {
+		t.Fatal("expected second Esc to cancel filter mode")
 	}
 }
 
@@ -293,8 +299,8 @@ func TestEscDiffViewTakesPriorityOverSearch(t *testing.T) {
 // visible with diff view active, Esc first closes help (priority 1).
 func TestEscHelpTakesPriorityOverDiffView(t *testing.T) {
 	m := newTestMainModel(t)
-	m.width = 100
-	m.height = 40
+	m.width = testTermWidth
+	m.height = testTermHeight
 	m.helpOpen = true
 	m.activePanel = DiffViewerPanel
 

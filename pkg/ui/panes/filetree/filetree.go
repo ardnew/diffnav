@@ -47,6 +47,11 @@ func New(cfg config.Config) Model {
 	return m
 }
 
+// Update is intentionally a no-op. Key handling was previously performed here,
+// but it caused double-routing issues because BubbleTea dispatches messages to
+// both the parent and child models. All key handling is now centralized in the
+// top-level Update in pkg/ui/tui.go, which uses early returns to route each
+// key press exactly once.
 func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	return m, nil
 }

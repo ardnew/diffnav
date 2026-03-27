@@ -95,8 +95,8 @@ ui:
   # Customize the file tree width (default: 26)
   fileTreeWidth: 30
 
-  # Customize the search panel width (default: 50)
-  searchTreeWidth: 60
+  # Customize the filter panel width (default: 50)
+  filterTreeWidth: 60
 
   # Icon style: "status" (default), "simple", "filetype", "full", "unicode", or "ascii"
   icons: nerd-fonts-status
@@ -117,7 +117,7 @@ ui:
 | `ui.hideFooter`      | bool   | `false`             | Hide the footer with keybindings help                     |
 | `ui.showFileTree`    | bool   | `true`              | Show file tree on startup                                 |
 | `ui.fileTreeWidth`   | int    | `26`                | Width of the file tree sidebar                            |
-| `ui.searchTreeWidth` | int    | `50`                | Width of the search panel                                 |
+| `ui.filterTreeWidth` | int    | `50`                | Width of the filter panel                                 |
 | `ui.icons`           | string | `nerd-fonts-status` | Icon style (see below for details)                        |
 | `ui.colorFileNames`  | bool   | `true`              | Color filenames by git status                             |
 | `ui.showDiffStats`   | bool   | `true`              | Show the amount of lines added / removed next to the file |
@@ -158,7 +158,7 @@ If you want the exact delta configuration I'm using - [it can be found here](htt
 | <kbd>g</kbd>      | <kbd>Home</kbd>                | Scroll to top                    |
 | <kbd>G</kbd>      | <kbd>End</kbd>                 | Scroll to bottom                 |
 | <kbd>e</kbd>      |                                | Toggle the file tree             |
-| <kbd>F3</kbd>      |                                | Filter files                     |
+| <kbd>F3</kbd> / <kbd>t</kbd> |                        | Filter files                     |
 | <kbd>y</kbd>      |                                | Copy file path                   |
 | <kbd>i</kbd>      |                                | Cycle icon style                 |
 | <kbd>o</kbd>      |                                | Edit file in $EDITOR             |

@@ -17,7 +17,7 @@ type KeyMap struct {
 	ScrollTop       key.Binding
 	ScrollBottom    key.Binding
 	ToggleFileTree  key.Binding
-	Search          key.Binding
+	Filter          key.Binding
 	Escape          key.Binding
 	Quit            key.Binding
 	Copy            key.Binding
@@ -85,9 +85,9 @@ var keys = &KeyMap{
 		key.WithKeys("e"),
 		key.WithHelp("e", "toggle file tree"),
 	),
-	Search: key.NewBinding(
-		key.WithKeys("f3"),
-		key.WithHelp("F3", "filter files"),
+	Filter: key.NewBinding(
+		key.WithKeys("t", "f3"),
+		key.WithHelp("F3/t", "filter files"),
 	),
 	Escape: key.NewBinding(
 		key.WithKeys("esc"),
@@ -144,7 +144,7 @@ func keyGroups() [][]key.Binding {
 		keys.ScrollBottom,
 	}, {
 		keys.ToggleFileTree,
-		keys.Search,
+		keys.Filter,
 		keys.Copy,
 		keys.OpenInEditor,
 		keys.ToggleDiffView,
