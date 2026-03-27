@@ -348,15 +348,11 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Route non-key messages to sub-components for internal processing
-	// (e.g. diffContentMsg).
-	switch msg.(type) {
-	case tea.KeyPressMsg, tea.KeyReleaseMsg:
-		// Already handled above; do not forward again.
-	default:
-		m.diffViewer, cmd = m.diffViewer.Update(msg)
-		cmds = append(cmds, cmd)
-		m.fileTree.Update(msg)
-	}
+	// (e.g. diffContentMsg). All key events return early above or are
+	// filtered out, so only non-key messages reach this point.
+	m.diffViewer, cmd = m.diffViewer.Update(msg)
+	cmds = append(cmds, cmd)
+	m.fileTree.Update(msg)
 
 	return m, tea.Batch(cmds...)
 }
