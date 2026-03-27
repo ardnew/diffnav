@@ -613,11 +613,14 @@ func highlightMatch(s, query string, base lipgloss.Style) string {
 	for i < len(s) {
 		// Advance j past qRunes runes starting at i.
 		j := i
-		for n := 0; n < qRunes && j < len(s); n++ {
+		n := 0
+		for n < qRunes && j < len(s) {
 			_, size := utf8.DecodeRuneInString(s[j:])
 			j += size
+			n++
 		}
-		if j > len(s) {
+		if n < qRunes {
+			// Not enough runes remaining for a match.
 			break
 		}
 		if strings.EqualFold(s[i:j], query) {
